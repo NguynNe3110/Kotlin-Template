@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Baseon Kotlin MVVM</string>
+    <string name="todo_title">Todo App - Kotlin Clean MVVM</string>
+    <string name="new_todo_hint">Nhập công việc mới...</string>
+    <string name="add_button">Thêm</string>
+    <string name="add_todo_description">Thêm công việc</string>
+    <string name="retry_button">Thử lại</string>
+    <string name="empty_todo_list">Chưa có công việc nào!</string>
+</resources>
