@@ -12,6 +12,8 @@
 <p align="center">
   <a href="README.md">English</a> · <strong>Tiếng Việt</strong> ·
   <a href="docs/architecture.md">Hướng dẫn kiến trúc</a> ·
+  <a href="docs/ai-improvements-summary.md">Tổng hợp cải tiến AI</a> ·
+  <a href="docs/product-driven-roadmap.md">Lộ trình thực chiến Product</a> ·
   <a href="CONTRIBUTING.md">Đóng góp</a> · <a href="LICENSE">MIT License</a>
 </p>
 

@@ -20,6 +20,7 @@
 <p align="center">
   <strong>English</strong> · <a href="README.vi.md">Tiếng Việt</a> ·
   <a href="docs/architecture.md">Architecture guide</a> ·
+  <a href="docs/ai-improvements-summary.md">AI Improvements Summary</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
