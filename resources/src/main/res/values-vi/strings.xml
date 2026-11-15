@@ -47,6 +47,7 @@
     <string name="error_server_with_code">Lỗi máy chủ (%1$d). Vui lòng thử lại sau.</string>
     <string name="error_validation_generic">Dữ liệu không hợp lệ.</string>
     <string name="error_validation_empty_title">Tiêu đề không được để trống!</string>
+    <string name="error_search_query_empty">Từ khóa tìm kiếm không được để trống</string>
     <string name="error_parse">Dữ liệu nhận được không hợp lệ.</string>
     <string name="error_unknown">Đã xảy ra lỗi không xác định. Vui lòng thử lại.</string>
 </resources>

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.base.domain.model.User
 import com.example.base.domain.usecase.GetUsersInput
 import com.example.base.domain.usecase.GetUsersUseCase
+import com.example.base.resources.R
 import com.example.base.shared.action.ActionRunner
 import com.example.base.shared.action.LoadingKey
 import com.example.base.shared.action.LoadingManager
@@ -17,9 +18,12 @@ import com.example.base.shared.flow.droppable
 import com.example.base.ui.base.PendingUiEffect
 import com.example.base.ui.base.ScreenUiController
 import com.example.base.ui.base.UiEffect
+import com.example.base.ui.base.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,8 +67,8 @@ class UserViewModel @Inject constructor(
     val uiState: StateFlow<UserSearchUiState> = _uiState.asStateFlow()
 
     // Inline field error for form/input validation
-    private val _searchFieldError = MutableStateFlow<String?>(null)
-    val searchFieldError: StateFlow<String?> = _searchFieldError.asStateFlow()
+    private val _searchFieldError = MutableStateFlow<UiText?>(null)
+    val searchFieldError: StateFlow<UiText?> = _searchFieldError.asStateFlow()
 
     // ScreenUiController implementation via composition
     override val loadingKeys: StateFlow<Map<LoadingKey, Int>> = loadingManager.loadingKeys
@@ -81,16 +85,39 @@ class UserViewModel @Inject constructor(
         _effects.update { pending -> pending.filterNot { it.id == id } }
     }
 
+    private var searchJob: Job? = null
+    private val latestRequestId = AtomicLong(0)
+    @Volatile
+    private var lastSubmittedQuery: String? = null
+
+    private fun cancelActiveSearch() {
+        searchJob?.cancel()
+        searchJob = null
+    }
+
     // Droppable refresh action: ignores subsequent clicks while an execution is running
     val refreshAction: DroppableAction = droppable(viewModelScope) {
-        performSearch(query.value)
+        val trimmed = query.value.trim()
+        if (trimmed.isNotEmpty()) {
+            cancelActiveSearch()
+            searchJob = coroutineContext[Job]
+            performSearch(trimmed)
+        }
     }
 
     init {
         // Automatic search debounced with latest-result semantics
         viewModelScope.launch {
             query.debounceWithLatest(timeoutMillis = 300L) { q ->
-                performSearch(q)
+                val trimmed = q.trim()
+                if (trimmed.isEmpty()) {
+                    cancelActiveSearch()
+                    _uiState.value = UserSearchUiState.Idle
+                } else if (trimmed != lastSubmittedQuery) {
+                    cancelActiveSearch()
+                    searchJob = coroutineContext[Job]
+                    performSearch(trimmed)
+                }
             }.collect()
         }
     }
@@ -98,34 +125,41 @@ class UserViewModel @Inject constructor(
     fun onQueryChanged(newQuery: String) {
         _query.value = newQuery
         _searchFieldError.value = null
+        lastSubmittedQuery = null
     }
 
     suspend fun performSearch(q: String) {
         val trimmed = q.trim()
         if (trimmed.isEmpty()) {
+            cancelActiveSearch()
             _uiState.value = UserSearchUiState.Idle
             return
         }
 
+        val requestId = latestRequestId.incrementAndGet()
         _uiState.value = UserSearchUiState.Loading
         actionRunner.execute(
             key = LoadingKey.Initial,
             action = { getUsersUseCase(GetUsersInput(page = 1, pageSize = 20)) },
             onSuccess = { output ->
-                val filtered = output.users.filter { user ->
-                    user.name.contains(trimmed, ignoreCase = true) ||
-                    user.email.contains(trimmed, ignoreCase = true) ||
-                    user.username.contains(trimmed, ignoreCase = true)
-                }
-                _uiState.value = if (filtered.isEmpty()) {
-                    UserSearchUiState.Empty(trimmed)
-                } else {
-                    UserSearchUiState.Success(filtered, trimmed)
+                if (requestId == latestRequestId.get()) {
+                    val filtered = output.users.filter { user ->
+                        user.name.contains(trimmed, ignoreCase = true) ||
+                        user.email.contains(trimmed, ignoreCase = true) ||
+                        user.username.contains(trimmed, ignoreCase = true)
+                    }
+                    _uiState.value = if (filtered.isEmpty()) {
+                        UserSearchUiState.Empty(trimmed)
+                    } else {
+                        UserSearchUiState.Success(filtered, trimmed)
+                    }
                 }
             },
             onFailure = { error ->
-                _uiState.value = UserSearchUiState.Error(error)
-                enqueueEffect(UiEffect.ShowError(error))
+                if (requestId == latestRequestId.get()) {
+                    _uiState.value = UserSearchUiState.Error(error)
+                    enqueueEffect(UiEffect.ShowError(error))
+                }
             }
         )
     }
@@ -133,10 +167,12 @@ class UserViewModel @Inject constructor(
     fun submitSearch() {
         val trimmed = query.value.trim()
         if (trimmed.isEmpty()) {
-            _searchFieldError.value = "Search query cannot be empty"
+            _searchFieldError.value = UiText.StringResource(R.string.error_search_query_empty)
             return
         }
-        viewModelScope.launch {
+        lastSubmittedQuery = trimmed
+        cancelActiveSearch()
+        searchJob = viewModelScope.launch {
             performSearch(trimmed)
         }
     }

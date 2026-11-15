@@ -47,6 +47,7 @@
     <string name="error_server_with_code">Server error (%1$d). Please try again later.</string>
     <string name="error_validation_generic">Validation error.</string>
     <string name="error_validation_empty_title">Title cannot be empty!</string>
+    <string name="error_search_query_empty">Search query cannot be empty</string>
     <string name="error_parse">Invalid data received.</string>
     <string name="error_unknown">An unknown error occurred. Please try again.</string>
 </resources>

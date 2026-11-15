@@ -62,8 +62,11 @@ class DefaultUiErrorMessageMapper(
         if (exception.code == "EMPTY_TITLE" || exception.field == "title") {
             return UiText.StringResource(R.string.error_validation_empty_title)
         }
+        if (exception.code == "EMPTY_QUERY" || exception.code == "SEARCH_QUERY_EMPTY" || exception.field == "query") {
+            return UiText.StringResource(R.string.error_search_query_empty)
+        }
         val msg = exception.message
-        if (msg.isNotBlank() && msg != "Validation error" && msg != "Tiêu đề không được để trống!") {
+        if (msg.isNotBlank() && msg != "Validation error" && msg != "Tiêu đề không được để trống!" && msg != "Search query cannot be empty") {
             return UiText.DynamicString(msg)
         }
         return UiText.StringResource(R.string.error_validation_generic)

@@ -2,9 +2,17 @@ package com.example.base.ui.base
 
 import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.material3.SnackbarHostState
+import com.example.base.navigation.NoOpAppNavigator
 import com.example.base.resources.R
 import com.example.base.shared.error.AppException
 import com.example.base.shared.error.NetworkErrorKind
+import java.util.Locale
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -14,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class UiErrorMessageMapperTest {
@@ -59,6 +68,14 @@ class UiErrorMessageMapperTest {
         assertIs<UiText.StringResource>(titleField)
         assertEquals(R.string.error_validation_empty_title, titleField.resId)
 
+        val emptyQueryCode = mapper.mapToUiText(AppException.ValidationError(code = "EMPTY_QUERY"))
+        assertIs<UiText.StringResource>(emptyQueryCode)
+        assertEquals(R.string.error_search_query_empty, emptyQueryCode.resId)
+
+        val queryField = mapper.mapToUiText(AppException.ValidationError(field = "query"))
+        assertIs<UiText.StringResource>(queryField)
+        assertEquals(R.string.error_search_query_empty, queryField.resId)
+
         val customValidation = mapper.mapToUiText(AppException.ValidationError(message = "Password too short"))
         assertIs<UiText.DynamicString>(customValidation)
         assertEquals("Password too short", customValidation.value)
@@ -103,5 +120,66 @@ class UiErrorMessageMapperTest {
 
         val emptyTitleString = contextMapper.map(AppException.ValidationError(code = "EMPTY_TITLE"))
         assertEquals("Title cannot be empty!", emptyTitleString)
+
+        val emptyQueryString = contextMapper.map(AppException.ValidationError(code = "EMPTY_QUERY"))
+        assertEquals("Search query cannot be empty", emptyQueryString)
+    }
+
+    @Test
+    fun resolvesActualLocalizedStringsWithVietnameseContext() {
+        val viConfig = Configuration(context.resources.configuration).apply {
+            setLocale(Locale("vi"))
+        }
+        val viContext = context.createConfigurationContext(viConfig)
+        val viMapper = DefaultUiErrorMessageMapper(viContext)
+
+        val noInternet = viMapper.map(AppException.NetworkError(kind = NetworkErrorKind.NoInternet))
+        assertEquals("Không có kết nối internet.", noInternet)
+
+        val server503 = viMapper.map(AppException.ServerError(httpCode = 503))
+        assertEquals("Lỗi máy chủ (503). Vui lòng thử lại sau.", server503)
+
+        val emptyTitle = viMapper.map(AppException.ValidationError(code = "EMPTY_TITLE"))
+        assertEquals("Tiêu đề không được để trống!", emptyTitle)
+
+        val emptyQuery = viMapper.map(AppException.ValidationError(code = "EMPTY_QUERY"))
+        assertEquals("Từ khóa tìm kiếm không được để trống", emptyQuery)
+    }
+
+    @Test
+    fun appEffectHandlerResolvesEffectsWithEnglishAndVietnameseLocales() = runTest {
+        // English
+        val enHostState = SnackbarHostState()
+        val enHandler = DefaultAppEffectHandler(context)
+        val jobEn = launch {
+            enHandler.handle(
+                effect = UiEffect.ShowError(AppException.NetworkError(kind = NetworkErrorKind.NoInternet), onRetry = {}),
+                snackbarHostState = enHostState,
+                navigator = NoOpAppNavigator()
+            )
+        }
+        runCurrent()
+        assertEquals("No internet connection.", enHostState.currentSnackbarData?.visuals?.message)
+        assertEquals("Retry", enHostState.currentSnackbarData?.visuals?.actionLabel)
+        jobEn.cancel()
+
+        // Vietnamese
+        val viConfig = Configuration(context.resources.configuration).apply {
+            setLocale(Locale("vi"))
+        }
+        val viContext = context.createConfigurationContext(viConfig)
+        val viHostState = SnackbarHostState()
+        val viHandler = DefaultAppEffectHandler(viContext)
+        val jobVi = launch {
+            viHandler.handle(
+                effect = UiEffect.ShowError(AppException.NetworkError(kind = NetworkErrorKind.NoInternet), onRetry = {}),
+                snackbarHostState = viHostState,
+                navigator = NoOpAppNavigator()
+            )
+        }
+        runCurrent()
+        assertEquals("Không có kết nối internet.", viHostState.currentSnackbarData?.visuals?.message)
+        assertEquals("Thử lại", viHostState.currentSnackbarData?.visuals?.actionLabel)
+        jobVi.cancel()
     }
 }

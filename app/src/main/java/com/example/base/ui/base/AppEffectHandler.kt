@@ -1,7 +1,10 @@
 package com.example.base.ui.base
 
+import android.content.Context
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import com.example.base.navigation.AppNavigator
+import com.example.base.resources.R
 import com.example.base.shared.error.AppException
 
 fun interface ErrorMessageMapper {
@@ -17,9 +20,18 @@ interface AppEffectHandler {
 }
 
 class DefaultAppEffectHandler(
-    private val messageMapper: ErrorMessageMapper = DefaultUiErrorMessageMapper(),
+    private val messageMapper: ErrorMessageMapper,
     private val retryLabel: String = "Retry"
 ) : AppEffectHandler {
+
+    constructor(
+        context: Context? = null,
+        retryLabel: String? = null
+    ) : this(
+        messageMapper = DefaultUiErrorMessageMapper(context),
+        retryLabel = retryLabel ?: context?.getString(R.string.button_retry) ?: "Retry"
+    )
+
     override suspend fun handle(
         effect: UiEffect,
         snackbarHostState: SnackbarHostState,
@@ -32,7 +44,7 @@ class DefaultAppEffectHandler(
                     message = messageMapper.map(effect.exception),
                     actionLabel = action
                 )
-                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                if (result == SnackbarResult.ActionPerformed) {
                     effect.onRetry?.invoke()
                 }
             }

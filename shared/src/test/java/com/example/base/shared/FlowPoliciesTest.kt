@@ -6,6 +6,8 @@ import com.example.base.shared.flow.debounceWithLatestFlow
 import com.example.base.shared.flow.droppable
 import com.example.base.shared.flow.droppableTransform
 import com.example.base.shared.flow.sequential
+import com.example.base.shared.flow.sequentialAction
+import com.example.base.shared.flow.sequentialQueue
 import com.example.base.shared.flow.throttleFirst
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -248,6 +250,188 @@ class FlowPoliciesTest {
 
         assertEquals(listOf(1, 3), processed)
         onEvent.close()
+    }
+
+    @Test
+    fun sequentialTryEnqueueReturnsFalseWhenBoundedBufferIsFull() = runTest {
+        val processed = mutableListOf<Int>()
+        val gate = CompletableDeferred<Unit>()
+
+        val onEvent = sequential<Int>(
+            scope = this,
+            capacity = 1,
+            onBufferOverflow = BufferOverflow.SUSPEND
+        ) { item ->
+            if (item == 1) gate.await()
+            processed += item
+        }
+
+        // First item is picked up by consumer loop and waits at gate
+        assertTrue(onEvent.tryEnqueue(1))
+        runCurrent()
+
+        // Buffer has capacity = 1, so second item is accepted into buffer
+        assertTrue(onEvent.tryEnqueue(2))
+        runCurrent()
+
+        // Buffer is now full (item 1 processing, item 2 in buffer).
+        // Under BufferOverflow.SUSPEND, non-blocking tryEnqueue must return false!
+        assertFalse(onEvent.tryEnqueue(3))
+        runCurrent()
+
+        // Release gate to let item 1 complete
+        gate.complete(Unit)
+        runCurrent()
+
+        // Item 1 and item 2 have finished. Item 3 was rejected and thus not processed.
+        assertEquals(listOf(1, 2), processed)
+
+        // Capacity is now free, next tryEnqueue is accepted
+        assertTrue(onEvent.tryEnqueue(4))
+        runCurrent()
+
+        assertEquals(listOf(1, 2, 4), processed)
+        onEvent.close()
+    }
+
+    @Test
+    fun sequentialSuspendEnqueueWaitsUntilCapacityIsAvailableInsteadOfDropping() = runTest {
+        val processed = mutableListOf<Int>()
+        val gate = CompletableDeferred<Unit>()
+
+        val onEvent = sequential<Int>(
+            scope = this,
+            capacity = 1,
+            onBufferOverflow = BufferOverflow.SUSPEND
+        ) { item ->
+            if (item == 1) gate.await()
+            processed += item
+        }
+
+        // First item starts processing and waits at gate
+        onEvent.enqueue(1)
+        runCurrent()
+
+        // Second item occupies the 1-slot buffer
+        onEvent.enqueue(2)
+        runCurrent()
+
+        // Third item is enqueued via suspending enqueue().
+        // Since buffer is full with BufferOverflow.SUSPEND, enqueue(3) must suspend!
+        var item3Enqueued = false
+        val enqueueJob = launch {
+            onEvent.enqueue(3)
+            item3Enqueued = true
+        }
+        runCurrent()
+
+        // Verify that enqueue(3) is suspended waiting for capacity, NOT dropped!
+        assertFalse(item3Enqueued)
+        assertTrue(enqueueJob.isActive)
+        assertEquals(emptyList(), processed)
+
+        // Release gate for item 1 -> frees buffer when item 2 is picked up by consumer
+        gate.complete(Unit)
+        runCurrent()
+
+        // Item 3 has now successfully enqueued into the freed buffer slot
+        assertTrue(item3Enqueued)
+        assertTrue(enqueueJob.isCompleted)
+
+        // Allow consumer to finish processing items 2 and 3
+        runCurrent()
+
+        // All 3 items processed in strict FIFO order without dropping!
+        assertEquals(listOf(1, 2, 3), processed)
+        onEvent.close()
+    }
+
+    @Test
+    fun sequentialActionSuspendEnqueueAndTryEnqueue() = runTest {
+        var processedCount = 0
+        val gate = CompletableDeferred<Unit>()
+
+        val action = sequentialAction(
+            scope = this,
+            capacity = 1,
+            onBufferOverflow = BufferOverflow.SUSPEND
+        ) {
+            if (processedCount == 0) gate.await()
+            processedCount++
+        }
+
+        assertTrue(action.tryEnqueue())
+        runCurrent()
+
+        assertTrue(action.tryEnqueue())
+        runCurrent()
+
+        // Buffer full -> tryEnqueue returns false
+        assertFalse(action.tryEnqueue())
+
+        var enqueueResumed = false
+        val job = launch {
+            action.enqueue()
+            enqueueResumed = true
+        }
+        runCurrent()
+        assertFalse(enqueueResumed)
+
+        gate.complete(Unit)
+        runCurrent()
+
+        assertTrue(enqueueResumed)
+        assertTrue(job.isCompleted)
+
+        assertEquals(3, processedCount)
+        action.close()
+    }
+
+    @Test
+    fun sequentialQueueSuspendEnqueueAndTryEnqueue() = runTest {
+        val executed = mutableListOf<String>()
+        val gate = CompletableDeferred<Unit>()
+
+        val queue = sequentialQueue(
+            scope = this,
+            capacity = 1,
+            onBufferOverflow = BufferOverflow.SUSPEND
+        )
+
+        assertTrue(queue.tryEnqueue {
+            gate.await()
+            executed += "first"
+        })
+        runCurrent()
+
+        assertTrue(queue.tryEnqueue {
+            executed += "second"
+        })
+        runCurrent()
+
+        // Buffer full -> tryEnqueue returns false
+        assertFalse(queue.tryEnqueue {
+            executed += "dropped"
+        })
+
+        // Suspend enqueue waits until capacity is available
+        var thirdEnqueued = false
+        val enqueueJob = launch {
+            queue.enqueue {
+                executed += "third"
+            }
+            thirdEnqueued = true
+        }
+        runCurrent()
+        assertFalse(thirdEnqueued)
+
+        gate.complete(Unit)
+        runCurrent()
+
+        assertTrue(thirdEnqueued)
+        assertTrue(enqueueJob.isCompleted)
+        assertEquals(listOf("first", "second", "third"), executed)
+        queue.close()
     }
 
     // endregion

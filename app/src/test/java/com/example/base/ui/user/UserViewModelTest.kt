@@ -6,12 +6,14 @@ import com.example.base.domain.model.User
 import com.example.base.domain.repository.UserRepository
 import com.example.base.domain.usecase.GetUsersUseCase
 import com.example.base.domain.usecase.base.PageResult
+import com.example.base.resources.R
 import com.example.base.shared.error.AppException
 import com.example.base.shared.error.DefaultErrorMapper
 import com.example.base.shared.logging.NoOpLogger
 import com.example.base.shared.result.Result
 import com.example.base.ui.base.BaseViewModel
 import com.example.base.ui.base.UiEffect
+import com.example.base.ui.base.UiText
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,6 +54,7 @@ class UserViewModelTest {
     }
 
     @Test
+    @Suppress("USELESS_IS_CHECK", "USELESS_CAST")
     fun extendsViewModelDirectlyAndNotBaseViewModel() {
         val model = createModel()
         assertTrue(model is ViewModel, "Must extend androidx.lifecycle.ViewModel")
@@ -135,11 +138,100 @@ class UserViewModelTest {
         model.submitSearch()
         runCurrent()
 
-        assertEquals("Search query cannot be empty", model.searchFieldError.value)
+        val error = assertIs<UiText.StringResource>(model.searchFieldError.value)
+        assertEquals(R.string.error_search_query_empty, error.resId)
         assertEquals(0, repository.fetchCalls)
 
         model.onQueryChanged("valid")
         assertNull(model.searchFieldError.value)
+    }
+
+    @Test
+    fun submitSearchExecutesImmediatelyAndDebounceDoesNotDuplicate() = runTest {
+        val model = createModel()
+        model.onQueryChanged("alice")
+        advanceTimeBy(50)
+        assertEquals(0, repository.fetchCalls)
+
+        model.submitSearch()
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.fetchCalls)
+        val success = assertIs<UserSearchUiState.Success>(model.uiState.value)
+        assertEquals("Alice Smith", success.users.single().name)
+
+        // Advancing past debounce threshold does not trigger duplicate fetch
+        advanceTimeBy(400)
+        advanceUntilIdle()
+        assertEquals(1, repository.fetchCalls)
+    }
+
+    @Test
+    fun searchSubmitCancelsInFlightDebouncedSearch() = runTest {
+        val model = createModel()
+        val gate = CompletableDeferred<Unit>()
+        repository.fetchGate = gate
+
+        model.onQueryChanged("alice")
+        advanceTimeBy(350)
+        runCurrent()
+        assertEquals(1, repository.fetchCalls)
+        assertTrue(model.loadingManager.isLoading)
+
+        // User changes query to "bob" and immediately submits
+        model.onQueryChanged("bob")
+        model.submitSearch()
+        runCurrent()
+        assertEquals(2, repository.fetchCalls)
+
+        // Complete the gate
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        // State must reflect the newer search "bob", NOT "alice"
+        val success = assertIs<UserSearchUiState.Success>(model.uiState.value)
+        assertEquals("bob", success.query)
+        assertEquals("Bob Jones", success.users.single().name)
+    }
+
+    @Test
+    fun olderRequestCompletingLaterDoesNotOverwriteNewerResult() = runTest {
+        val model = createModel()
+        val gate1 = CompletableDeferred<Unit>()
+        val gate2 = CompletableDeferred<Unit>()
+        repository.onFetch = { callIndex ->
+            if (callIndex == 1) gate1.await()
+            if (callIndex == 2) gate2.await()
+        }
+
+        // Request 1: Search "alice"
+        model.onQueryChanged("alice")
+        model.submitSearch()
+        runCurrent()
+        assertEquals(1, repository.fetchCalls)
+
+        // Request 2: Search "bob"
+        model.onQueryChanged("bob")
+        model.submitSearch()
+        runCurrent()
+        assertEquals(2, repository.fetchCalls)
+
+        // Complete Request 2 FIRST
+        gate2.complete(Unit)
+        runCurrent()
+        val success2 = assertIs<UserSearchUiState.Success>(model.uiState.value)
+        assertEquals("bob", success2.query)
+        assertEquals("Bob Jones", success2.users.single().name)
+
+        // Now complete Request 1 LATER
+        gate1.complete(Unit)
+        advanceUntilIdle()
+
+        // Verify Request 1 did NOT overwrite Request 2!
+        val stateAfter = assertIs<UserSearchUiState.Success>(model.uiState.value)
+        assertEquals("bob", stateAfter.query)
+        assertEquals("Bob Jones", stateAfter.users.single().name)
     }
 
     @Test
@@ -176,6 +268,7 @@ class UserViewModelTest {
         var fetchCalls = 0
         var failure: AppException? = null
         var fetchGate: CompletableDeferred<Unit>? = null
+        var onFetch: (suspend (callIndex: Int) -> Unit)? = null
 
         private val users = listOf(
             User(id = 1, name = "Alice Smith", username = "alice", email = "alice@example.com", phone = "123", website = null),
@@ -184,6 +277,8 @@ class UserViewModelTest {
 
         override suspend fun getUsers(page: Int, pageSize: Int): Result<PageResult<User>> {
             fetchCalls++
+            val callIndex = fetchCalls
+            onFetch?.invoke(callIndex)
             fetchGate?.await()
             failure?.let { return Result.Failure(it) }
             return Result.Success(PageResult(items = users, page = page, pageSize = pageSize, hasNext = false))

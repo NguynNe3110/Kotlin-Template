@@ -14,7 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,6 +24,7 @@ import com.example.base.domain.model.User
 import com.example.base.navigation.AppNavigator
 import com.example.base.navigation.AppRoute
 import com.example.base.resources.R
+import com.example.base.ui.base.DefaultUiErrorMessageMapper
 
 @Composable
 fun UsersScreen(
@@ -34,7 +37,12 @@ fun UsersScreen(
     when (val current = state) {
         UsersUiState.Loading -> Text(stringResource(R.string.loading_users), modifier.padding(16.dp))
         is UsersUiState.Error -> Column(modifier.padding(16.dp)) {
-            Text(current.error.message, color = MaterialTheme.colorScheme.error)
+            val context = LocalContext.current
+            val errorMessageMapper = remember(context) { DefaultUiErrorMessageMapper(context) }
+            val errorMessage = remember(current.error, context) {
+                errorMessageMapper.map(context, current.error)
+            }
+            Text(errorMessage, color = MaterialTheme.colorScheme.error)
             Button(onClick = viewModel::loadUsers) { Text(stringResource(R.string.button_retry)) }
         }
         is UsersUiState.Success -> Column(modifier.fillMaxSize()) {

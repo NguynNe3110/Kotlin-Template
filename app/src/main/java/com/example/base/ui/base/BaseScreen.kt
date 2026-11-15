@@ -52,9 +52,9 @@ fun BaseScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
-    val defaultEffectHandler = remember { DefaultAppEffectHandler() }
-    val resolvedEffectHandler = effectHandler ?: defaultEffectHandler
     val context = LocalContext.current
+    val defaultEffectHandler = remember(context) { DefaultAppEffectHandler(context) }
+    val resolvedEffectHandler = effectHandler ?: defaultEffectHandler
     val errorMessageMapper = remember(context) { DefaultUiErrorMessageMapper(context) }
 
     LaunchedEffect(controller, resolvedEffectHandler, navigator, lifecycleOwner) {
@@ -125,12 +125,12 @@ fun BaseScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val defaultEffectHandler = remember { DefaultAppEffectHandler() }
-    val resolvedEffectHandler = effectHandler ?: defaultEffectHandler
     val context = LocalContext.current
+    val defaultEffectHandler = remember(context) { DefaultAppEffectHandler(context) }
+    val resolvedEffectHandler = effectHandler ?: defaultEffectHandler
     val errorMessageMapper = remember(context) { DefaultUiErrorMessageMapper(context) }
 
-    LaunchedEffect(pendingEffects, resolvedEffectHandler, navigator) {
+    LaunchedEffect(pendingEffects.firstOrNull()?.id, resolvedEffectHandler, navigator) {
         val pending = pendingEffects.firstOrNull()
         if (pending != null && pending.effect !is UiEffect.ShowDialog) {
             resolvedEffectHandler.handle(pending.effect, snackbarHostState, navigator)
