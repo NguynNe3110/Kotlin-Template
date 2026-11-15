@@ -2,12 +2,14 @@ package com.example.base.ui.base
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.base.shared.action.ActionRunner
+import com.example.base.shared.action.LoadingKey
+import com.example.base.shared.action.LoadingManager
 import com.example.base.shared.error.AppException
 import com.example.base.shared.error.DefaultErrorMapper
 import com.example.base.shared.error.ErrorMapper
 import com.example.base.shared.result.Result
 import com.example.base.shared.retry.RetryConfig
-import com.example.base.shared.retry.RetryExecutor
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -15,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -23,88 +26,133 @@ import kotlinx.coroutines.launch
 
 data class PendingUiEffect(val id: Long, val effect: UiEffect)
 
-abstract class BaseViewModel(
-    protected val errorMapper: ErrorMapper = DefaultErrorMapper
-) : ViewModel() {
-    private val retryExecutor = RetryExecutor(errorMapper = errorMapper)
-    private val loadingOperations = MutableStateFlow<Map<LoadingKey, Int>>(emptyMap())
-    val loadingKeys = loadingOperations.asStateFlow()
-    val isLoading = loadingOperations
+/**
+ * Base ViewModel providing convenient loading, action execution, and error presentation helpers
+ * by composing [LoadingManager] and [ActionRunner] from the shared toolkit.
+ *
+ * Implements [ScreenUiController] so screens using [BaseScreen] do not require tight coupling
+ * to class inheritance.
+ */
+open class BaseViewModel(
+    protected val errorMapper: ErrorMapper = DefaultErrorMapper,
+    val loadingManager: LoadingManager = LoadingManager(),
+    val actionRunner: ActionRunner = ActionRunner(loadingManager = loadingManager, errorMapper = errorMapper)
+) : ViewModel(), ScreenUiController {
+
+    override val loadingKeys: StateFlow<Map<LoadingKey, Int>> = loadingManager.loadingKeys
+
+    val isLoading: StateFlow<Boolean> = loadingManager.loadingKeys
         .map { it.isNotEmpty() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, loadingManager.isLoading)
 
     // Retain presentation effects until the UI acknowledges them, including across rotation.
     private val nextEffectId = AtomicLong()
     private val _effects = MutableStateFlow<List<PendingUiEffect>>(emptyList())
-    val effects = _effects.asStateFlow()
+    override val effects: StateFlow<List<PendingUiEffect>> = _effects.asStateFlow()
 
-    fun onEffectHandled(id: Long) {
+    override fun onEffectHandled(id: Long) {
         _effects.update { pending -> pending.filterNot { it.id == id } }
     }
 
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        if (throwable !is CancellationException) enqueue(UiEffect.ShowError(errorMapper.map(throwable)))
+        if (throwable !is CancellationException) {
+            emitError(errorMapper.map(throwable))
+        }
     }
 
     protected fun launchWithLoading(
         key: LoadingKey = LoadingKey.Initial,
         block: suspend CoroutineScope.() -> Unit
     ): Job = viewModelScope.launch(exceptionHandler) {
-        updateLoading(key, 1)
-        try {
+        loadingManager.withLoading(key) {
             block()
-        } finally {
-            updateLoading(key, -1)
         }
     }
 
     protected fun <T> launchOperation(
-        key: LoadingKey = LoadingKey.Initial,
+        key: LoadingKey? = LoadingKey.Initial,
         retryConfig: RetryConfig = RetryConfig(maxAttempts = 1),
         allowRetry: Boolean = false,
         showError: Boolean = true,
+        errorPresentation: ErrorPresentationMode = ErrorPresentationMode.Auto,
         action: suspend () -> Result<T>,
         onSuccess: suspend (T) -> Unit = {},
         onFailure: suspend (AppException) -> Unit = {}
-    ): Job = launchWithLoading(key) {
-        // Mutations must explicitly opt into replay; a network error alone is insufficient.
-        val config = if (allowRetry) retryConfig else RetryConfig(maxAttempts = 1)
-        when (val result = retryExecutor.execute(config, action)) {
-            is Result.Success -> onSuccess(result.data)
-            is Result.Failure -> {
-                val error = result.exception
+    ): Job = viewModelScope.launch(exceptionHandler) {
+        val effectiveMode = if (!showError) ErrorPresentationMode.None else errorPresentation
+        actionRunner.execute(
+            key = key,
+            retryConfig = retryConfig,
+            allowRetry = allowRetry,
+            onSuccess = { data -> onSuccess(data) },
+            onFailure = { error ->
                 onFailure(error)
-                if (showError) {
-                    val onRetry: (suspend () -> Unit)? = if (allowRetry && error.retryable) {
-                        {
-                            launchOperation(key, retryConfig, allowRetry, showError, action, onSuccess, onFailure)
-                            Unit
-                        }
-                    } else null
-                    emitError(error, onRetry)
-                }
-            }
-        }
-    }
+                val onRetry: (suspend () -> Unit)? = if (allowRetry && error.retryable) {
+                    {
+                        launchOperation(
+                            key = key,
+                            retryConfig = retryConfig,
+                            allowRetry = allowRetry,
+                            showError = showError,
+                            errorPresentation = errorPresentation,
+                            action = action,
+                            onSuccess = onSuccess,
+                            onFailure = onFailure
+                        )
+                        Unit
+                    }
+                } else null
 
-    protected fun emitError(exception: AppException, onRetry: (suspend () -> Unit)? = null) {
-        enqueue(
-            if (exception is AppException.ValidationError) UiEffect.ShowDialog("Validation error", exception, onRetry)
-            else UiEffect.ShowError(exception, onRetry)
+                presentError(error, effectiveMode, onRetry)
+            },
+            action = action
         )
     }
 
-    private fun enqueue(effect: UiEffect) {
-        val pending = PendingUiEffect(nextEffectId.incrementAndGet(), effect)
-        _effects.update { it + pending }
+    protected fun emitError(
+        exception: AppException,
+        onRetry: (suspend () -> Unit)? = null,
+        mode: ErrorPresentationMode = ErrorPresentationMode.Auto
+    ) {
+        presentError(exception, mode, onRetry)
     }
 
-    private fun updateLoading(key: LoadingKey, delta: Int) {
-        loadingOperations.update { operations ->
-            operations.toMutableMap().apply {
-                val next = (get(key) ?: 0) + delta
-                if (next > 0) put(key, next) else remove(key)
+    private fun presentError(
+        error: AppException,
+        mode: ErrorPresentationMode,
+        onRetry: (suspend () -> Unit)?
+    ) {
+        when (mode) {
+            ErrorPresentationMode.Auto -> {
+                if (error is AppException.ValidationError) {
+                    enqueue(UiEffect.ShowDialog("Validation error", error, onRetry))
+                } else {
+                    enqueue(UiEffect.ShowError(error, onRetry))
+                }
             }
+            is ErrorPresentationMode.Dialog -> {
+                enqueue(UiEffect.ShowDialog(mode.title, error, onRetry))
+            }
+            ErrorPresentationMode.Snackbar -> {
+                enqueue(UiEffect.ShowError(error, onRetry))
+            }
+            is ErrorPresentationMode.Inline -> {
+                mode.onInlineError(error)
+            }
+            is ErrorPresentationMode.ScreenError -> {
+                mode.onScreenError(error)
+            }
+            is ErrorPresentationMode.Custom -> {
+                viewModelScope.launch {
+                    mode.handler(error, onRetry)
+                }
+            }
+            ErrorPresentationMode.None -> Unit
         }
+    }
+
+    protected fun enqueue(effect: UiEffect) {
+        val pending = PendingUiEffect(nextEffectId.incrementAndGet(), effect)
+        _effects.update { it + pending }
     }
 }

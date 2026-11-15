@@ -35,7 +35,7 @@ class RetryExecutorTest {
         var calls = 0
         val result = RetryExecutor().execute {
             calls++
-            Result.Failure(AppException.ValidationError("invalid"))
+            Result.Failure(AppException.ValidationError(message = "invalid"))
         }
 
         assertEquals(1, calls)

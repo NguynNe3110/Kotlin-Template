@@ -5,4 +5,4 @@ data class PageResult<out T>(
     val page: Int,
     val pageSize: Int,
     val hasNext: Boolean
-)
+) : BaseOutput

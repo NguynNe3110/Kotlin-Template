@@ -46,14 +46,16 @@ Hilt ở app, ViewModel theo lifecycle, coroutine và StateFlow.
 | Thành phần | Cách triển khai |
 | --- | --- |
 | Kiến trúc | 5 module theo layer; Gradle kiểm tra chiều phụ thuộc giữa các module |
+| Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` qua dimension `environment` và hậu tố app ID |
+| Môi trường & Config | `AppConfig` / `AppEnvironment` validate API base URL, inject động vào Retrofit |
 | UI | Jetpack Compose, Material 3, lifecycle-aware state collection |
 | MVVM | ViewModel theo destination, StateFlow cho UiState, SavedStateHandle cho bản nháp |
 | DI | Hilt tại `app/di`, domain và data độc lập DI framework |
-| Nghiệp vụ | Entity, repository/session contract, các base use case suspend/Flow/sync/paging |
+| Nghiệp vụ | Entity, repository/session contract, `BaseInput`/`BaseOutput` contracts, use case suspend/Flow/sync/paging |
 | Network | Retrofit, OkHttp, Gson, DTO mapper và chuẩn hóa lỗi HTTP/JSON/body |
-| Thao tác UI | Loading theo key, effect chờ xác nhận, retry được cho phép tường minh |
+| UI & Concurrency | `LoadingManager`, `ActionRunner`, Flow policies tương đương RxDart (`throttleFirst`, `droppable`, `sequential`, `debounceWithLatest`) |
 | Session | Preferences DataStore, snapshot nguyên tử, Retry khi đọc lỗi, lưu trạng thái hết phiên |
-| Kiểm thử | Kotlin/JUnit, coroutine test, MockWebServer, Robolectric |
+| CI & Kiểm thử | GitHub Actions workflow, Kotlin/JUnit, coroutine test (runTest), MockWebServer, Robolectric |
 
 Các phiên bản khai báo hiện tại: Kotlin **1.9.23**, Hilt **2.51.1**, Coroutines **1.8.0**,
 Retrofit **2.11.0**, Navigation Compose **2.8.9**, Gradle **8.11.1**, AGP **8.3.1**.
@@ -79,22 +81,22 @@ git clone https://github.com/NguynNe3110/Kotlin-multi-module.git
 cd Kotlin-multi-module
 ```
 
-Mở thư mục gốc trong Android Studio, cấu hình JDK, sync rồi chạy cấu hình `app`.
+Mở thư mục gốc trong Android Studio, cấu hình JDK, sync rồi chạy cấu hình `app` theo variant mong muốn (khuyên dùng `devDebug` khi phát triển local).
 
 **Windows / PowerShell**
 
 ```powershell
-.\gradlew.bat verifyModuleBoundaries :app:assembleDebug
+.\gradlew.bat verifyModuleBoundaries :app:assembleDevDebug
 ```
 
 **macOS / Linux**
 
 ```bash
 chmod +x gradlew
-./gradlew verifyModuleBoundaries :app:assembleDebug
+./gradlew verifyModuleBoundaries :app:assembleDevDebug
 ```
 
-APK nằm ở `app/build/outputs/apk/debug/app-debug.apk`.
+APK nằm ở `app/build/outputs/apk/dev/debug/app-dev-debug.apk`.
 API mẫu không cần key. Todo lưu trong bộ nhớ, nên dữ liệu sẽ reset khi process khởi động lại.
 
 ## Kiến trúc
@@ -202,14 +204,14 @@ Xem [thứ tự thêm màn hình](docs/architecture.md#adding-a-screen) cùng li
 
 ```powershell
 .\gradlew.bat verifyModuleBoundaries
-.\gradlew.bat :domain:test :data:test :shared:test :app:testDebugUnitTest
-.\gradlew.bat :app:assembleDebug :app:lintDebug
+.\gradlew.bat :domain:test :data:test :shared:test
+.\gradlew.bat :app:testDevDebugUnitTest :app:testProdDebugUnitTest
+.\gradlew.bat :app:assembleDevDebug :app:assembleProdDebug
 ```
 
 Trên macOS/Linux, thay `.\gradlew.bat` bằng `./gradlew`.
 
-Bản đã kiểm tra local bằng JDK 21 có **35 test qua**, build debug và module boundaries thành công.
-Lint có **0 lỗi, 72 cảnh báo**; một nhóm Compose lint bị bỏ qua do API không tương thích.
+Bản đã kiểm tra local bằng JDK 21 có **103 test qua** trên toàn bộ 4 module (17 domain, 7 data, 33 shared, 46 app), build thành công trên cả hai variant `devDebug` và `prodDebug`, và đã tích hợp CI workflow trên GitHub Actions (`.github/workflows/ci.yml`).
 Xem [phạm vi kiểm thử và vị trí report](docs/testing.md).
 
 ## Phạm vi hiện tại

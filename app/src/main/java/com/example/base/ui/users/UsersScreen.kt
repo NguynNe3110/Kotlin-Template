@@ -14,12 +14,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.base.domain.model.User
 import com.example.base.navigation.AppNavigator
 import com.example.base.navigation.AppRoute
+import com.example.base.resources.R
 
 @Composable
 fun UsersScreen(
@@ -30,17 +32,17 @@ fun UsersScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val current = state) {
-        UsersUiState.Loading -> Text("Loading users...", modifier.padding(16.dp))
+        UsersUiState.Loading -> Text(stringResource(R.string.loading_users), modifier.padding(16.dp))
         is UsersUiState.Error -> Column(modifier.padding(16.dp)) {
             Text(current.error.message, color = MaterialTheme.colorScheme.error)
-            Button(onClick = viewModel::loadUsers) { Text("Retry") }
+            Button(onClick = viewModel::loadUsers) { Text(stringResource(R.string.button_retry)) }
         }
         is UsersUiState.Success -> Column(modifier.fillMaxSize()) {
             Button(
                 onClick = { navigator.navigate(AppRoute.Todo) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Text("Open Todo sample")
+                Text(stringResource(R.string.button_open_todo))
             }
             UsersList(current.users, Modifier.weight(1f))
             if (current.hasNext) {
@@ -49,7 +51,7 @@ fun UsersScreen(
                     enabled = !current.isLoadingMore,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text(if (current.isLoadingMore) "Loading..." else "Load more")
+                    Text(if (current.isLoadingMore) stringResource(R.string.loading_more) else stringResource(R.string.button_load_more))
                 }
             }
         }

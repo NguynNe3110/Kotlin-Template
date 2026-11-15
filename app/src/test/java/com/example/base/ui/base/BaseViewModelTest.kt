@@ -89,6 +89,69 @@ class BaseViewModelTest {
         assertTrue(model.effects.value.isEmpty())
     }
 
+    @Test
+    fun errorPresentationModeDialogPresentsDialogEffect() = runTest {
+        val model = model()
+        model.failWithMode(ErrorPresentationMode.Dialog(title = "Custom Dialog Title"))
+        advanceUntilIdle()
+        val pending = model.effects.value.single()
+        val dialog = assertIs<UiEffect.ShowDialog>(pending.effect)
+        assertEquals("Custom Dialog Title", dialog.title)
+    }
+
+    @Test
+    fun errorPresentationModeSnackbarPresentsShowErrorEffect() = runTest {
+        val model = model()
+        model.failWithMode(ErrorPresentationMode.Snackbar)
+        advanceUntilIdle()
+        val pending = model.effects.value.single()
+        assertIs<UiEffect.ShowError>(pending.effect)
+    }
+
+    @Test
+    fun errorPresentationModeInlineInvokesCallbackWithoutEnqueueingEffect() = runTest {
+        val model = model()
+        var inlineError: AppException? = null
+        model.failWithMode(ErrorPresentationMode.Inline { inlineError = it })
+        advanceUntilIdle()
+        assertTrue(model.effects.value.isEmpty())
+        assertIs<AppException.NetworkError>(inlineError)
+    }
+
+    @Test
+    fun errorPresentationModeScreenErrorInvokesScreenErrorCallback() = runTest {
+        val model = model()
+        var screenError: AppException? = null
+        model.failWithMode(ErrorPresentationMode.ScreenError { screenError = it })
+        advanceUntilIdle()
+        assertTrue(model.effects.value.isEmpty())
+        assertIs<AppException.NetworkError>(screenError)
+    }
+
+    @Test
+    fun errorPresentationModeNoneSuppressesEffects() = runTest {
+        val model = model()
+        model.failWithMode(ErrorPresentationMode.None)
+        advanceUntilIdle()
+        assertTrue(model.effects.value.isEmpty())
+        assertEquals(1, model.failureCallbacks)
+    }
+
+    @Test
+    fun loadingManagerViaCompositionTracksOperationState() = runTest {
+        val model = model()
+        val gate = CompletableDeferred<Unit>()
+        model.waitFor(gate)
+        advanceUntilIdle()
+        assertTrue(model.loadingManager.isLoading)
+        assertTrue(model.isLoading.value)
+        assertEquals(1, model.loadingManager.count(LoadingKey.Submit))
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(!model.loadingManager.isLoading)
+        assertEquals(0, model.loadingManager.count(LoadingKey.Submit))
+    }
+
     private class TestViewModel : BaseViewModel() {
         var actionCalls = 0
         var failureCallbacks = 0
@@ -100,6 +163,15 @@ class BaseViewModelTest {
         ): Job = launchOperation<Unit>(
             retryConfig = RetryConfig(maxAttempts = attempts),
             allowRetry = allowRetry,
+            action = { actionCalls++; Result.Failure(exception) },
+            onFailure = { failureCallbacks++ }
+        )
+
+        fun failWithMode(
+            mode: ErrorPresentationMode,
+            exception: AppException = AppException.NetworkError()
+        ): Job = launchOperation<Unit>(
+            errorPresentation = mode,
             action = { actionCalls++; Result.Failure(exception) },
             onFailure = { failureCallbacks++ }
         )

@@ -2,10 +2,12 @@ package com.example.base.ui.todo
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.example.base.domain.usecase.AddTodoInput
 import com.example.base.domain.usecase.AddTodoUseCase
 import com.example.base.domain.usecase.ObserveTodosUseCase
+import com.example.base.domain.usecase.ToggleTodoInput
 import com.example.base.domain.usecase.ToggleTodoUseCase
-import com.example.base.domain.usecase.base.NoParams
+import com.example.base.domain.usecase.base.NoInput
 import com.example.base.shared.error.ErrorMapper
 import com.example.base.shared.result.Result
 import com.example.base.ui.base.BaseViewModel
@@ -43,7 +45,7 @@ class TodoViewModel @Inject constructor(
         observeJob?.cancel()
         _uiState.value = TodoUiState.Loading
         observeJob = viewModelScope.launch {
-            observeTodosUseCase(NoParams).collect { result ->
+            observeTodosUseCase(NoInput).collect { result ->
                 _uiState.value = when (result) {
                     is Result.Success -> TodoUiState.Success(result.data)
                     is Result.Failure -> TodoUiState.Error(result.exception)
@@ -57,7 +59,7 @@ class TodoViewModel @Inject constructor(
         val submittedTitle = draft.value
         submitJob = launchOperation(
             key = LoadingKey.Submit,
-            action = { addTodoUseCase(submittedTitle) },
+            action = { addTodoUseCase(AddTodoInput(submittedTitle)) },
             onSuccess = {
                 // A new draft typed while the request was running must remain intact.
                 if (draft.value == submittedTitle) onDraftChanged("")
@@ -69,7 +71,7 @@ class TodoViewModel @Inject constructor(
         if (submitJob?.isActive == true) return
         submitJob = launchOperation(
             key = LoadingKey.Submit,
-            action = { toggleTodoUseCase(id) }
+            action = { toggleTodoUseCase(ToggleTodoInput(id)) }
         )
     }
 

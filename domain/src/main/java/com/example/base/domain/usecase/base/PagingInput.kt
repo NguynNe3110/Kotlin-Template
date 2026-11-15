@@ -1,6 +1,6 @@
 package com.example.base.domain.usecase.base
 
-interface PagingInput {
+interface PagingInput : BaseInput {
     val page: Int
     val pageSize: Int
 }

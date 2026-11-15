@@ -15,15 +15,17 @@ MockWebServer tests exercise networking locally.
 
 ```bash
 ./gradlew verifyModuleBoundaries
-./gradlew :domain:test :data:test :shared:test :app:testDebugUnitTest
-./gradlew :app:assembleDebug :app:lintDebug
+./gradlew :domain:test :data:test :shared:test
+./gradlew :app:testDevDebugUnitTest :app:testProdDebugUnitTest
+./gradlew :app:assembleDevDebug :app:assembleProdDebug
+./gradlew :app:lintDevDebug :app:lintProdRelease
 ```
 
 On Windows, replace `./gradlew` with `.\gradlew.bat`.
 For a targeted regression test:
 
 ```bash
-./gradlew :app:testDebugUnitTest --tests com.example.base.session.DataStoreSessionFailureTest
+./gradlew :app:testDevDebugUnitTest --tests com.example.base.session.DataStoreSessionFailureTest
 ```
 
 Gradle can reuse UP-TO-DATE results. To deliberately re-execute the selected tasks and their prerequisites,
@@ -44,26 +46,40 @@ add `--rerun-tasks`. This is useful when validating an environment change or col
 | Todo observation | Committed writes remain successful when subsequent list observation fails; list retry does not repeat a write |
 | Navigation | IDs round-trip with spaces, `+`, `/`, percent signs, query/fragment characters, and Unicode |
 
+## Build Variants and Flavors
+
+The project configures two product flavors (`dev`, `prod`) under dimension `environment`, combined with two build types (`debug`, `release`), yielding four distinct build variants:
+
+| Variant | Environment | Application ID | Purpose |
+| --- | --- | --- | --- |
+| `devDebug` | dev | `com.example.base.dev.debug` | Daily local development with dev endpoints |
+| `devRelease` | dev | `com.example.base.dev` | Release behavior validation against dev environment |
+| `prodDebug` | prod | `com.example.base.debug` | Intentional diagnostic build targeting production endpoint |
+| `prodRelease` | prod | `com.example.base` | Production release artifact |
+
+Each flavor generates `BuildConfig.ENVIRONMENT` and `BuildConfig.API_BASE_URL` (configurable via `DEV_API_BASE_URL` and `PROD_API_BASE_URL` properties/environment variables, with public JSONPlaceholder default). `AppConfig` validates scheme and trailing slash at runtime.
+
 ## Local verification snapshot
 
 The following describes the revision checked on **15 November 2026**, using JDK 21:
 
 | Check | Result |
 | --- | --- |
-| Module dependency boundaries | Passed |
-| Debug APK build | Passed |
-| JVM and Robolectric test suite | **35 passed**, 0 failed |
+| Module dependency boundaries | Passed (`verifyModuleBoundaries`) |
+| Variant APK builds | Passed (`assembleDevDebug`, `assembleProdDebug`) |
+| JVM and Robolectric test suite | **103 unique tests passed**, 0 failed (`domain`: 17, `data`: 7, `shared`: 33, `app`: 46) |
 | Android lint | **0 errors**, **72 warnings** |
 | Real device / emulator validation | Not performed |
 | Instrumented UI test suite | Not implemented |
 | Runtime profiling / benchmarks | Not performed |
+| CI automation | Passed via `.github/workflows/ci.yml` |
 
 Lint warnings include older dependency/SDK declarations, a missing application icon, and a Compose lint API
 compatibility issue. The incompatible Compose checks are skipped by lint, so a successful lint task does not
 mean those checks ran. Review toolchain compatibility before claiming comprehensive lint coverage.
 
 These results are a local snapshot. Re-run checks after changing code, dependencies, or build configuration.
-The repository does not currently include a CI workflow or a published code-coverage report.
+Continuous integration is automated via GitHub Actions in `.github/workflows/ci.yml`.
 
 ## Reports
 
@@ -72,9 +88,11 @@ The repository does not currently include a CI workflow or a published code-cove
 | Domain tests | `domain/build/reports/tests/test/index.html` |
 | Data tests | `data/build/reports/tests/test/index.html` |
 | Shared tests | `shared/build/reports/tests/test/index.html` |
-| App tests | `app/build/reports/tests/testDebugUnitTest/index.html` |
-| Lint | `app/build/reports/lint-results-debug.html` |
-| Debug APK | `app/build/outputs/apk/debug/app-debug.apk` |
+| App devDebug tests | `app/build/reports/tests/testDevDebugUnitTest/index.html` |
+| App prodDebug tests | `app/build/reports/tests/testProdDebugUnitTest/index.html` |
+| Lint | `app/build/reports/lint-results-devDebug.html` |
+| DevDebug APK | `app/build/outputs/apk/dev/debug/app-dev-debug.apk` |
+| ProdDebug APK | `app/build/outputs/apk/prod/debug/app-prod-debug.apk` |
 
 Build outputs are ignored by Git. A fresh clone will not contain them until you run the corresponding task.
 

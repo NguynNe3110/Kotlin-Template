@@ -17,7 +17,8 @@ interface AppEffectHandler {
 }
 
 class DefaultAppEffectHandler(
-    private val messageMapper: ErrorMessageMapper = ErrorMessageMapper { it.message }
+    private val messageMapper: ErrorMessageMapper = DefaultUiErrorMessageMapper(),
+    private val retryLabel: String = "Retry"
 ) : AppEffectHandler {
     override suspend fun handle(
         effect: UiEffect,
@@ -26,7 +27,7 @@ class DefaultAppEffectHandler(
     ) {
         when (effect) {
             is UiEffect.ShowError -> {
-                val action = if (effect.onRetry == null) null else "Retry"
+                val action = if (effect.onRetry == null) null else retryLabel
                 val result = snackbarHostState.showSnackbar(
                     message = messageMapper.map(effect.exception),
                     actionLabel = action

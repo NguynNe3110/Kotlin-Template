@@ -23,7 +23,31 @@ android {
         }
     }
 
+    flavorDimensions += listOf("environment")
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            val devApiBaseUrl = (project.findProperty("DEV_API_BASE_URL") as? String)
+                ?: System.getenv("DEV_API_BASE_URL")
+                ?: "https://jsonplaceholder.typicode.com/"
+            buildConfigField("String", "ENVIRONMENT", "\"dev\"")
+            buildConfigField("String", "API_BASE_URL", "\"$devApiBaseUrl\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            val prodApiBaseUrl = (project.findProperty("PROD_API_BASE_URL") as? String)
+                ?: System.getenv("PROD_API_BASE_URL")
+                ?: "https://jsonplaceholder.typicode.com/"
+            buildConfigField("String", "ENVIRONMENT", "\"prod\"")
+            buildConfigField("String", "API_BASE_URL", "\"$prodApiBaseUrl\"")
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

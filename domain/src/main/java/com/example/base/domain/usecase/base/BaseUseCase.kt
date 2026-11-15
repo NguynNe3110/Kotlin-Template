@@ -11,16 +11,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * BaseUseCase trừu tượng hóa việc thực thi logic nghiệp vụ.
+ * BaseUseCase trừu tượng hóa việc thực thi logic nghiệp vụ suspend.
  * Cung cấp operator `invoke` giúp gọi UseCase trực tiếp như một hàm.
  * Tự động chuyển Coroutine Context sang [dispatcher] (mặc định là Dispatchers.IO).
  */
-abstract class BaseUseCase<in P, out R>(
+abstract class BaseUseCase<in I : BaseInput, out O : BaseOutput>(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val logger: AppLogger = NoOpLogger,
     private val errorMapper: ErrorMapper = DefaultErrorMapper
 ) {
-    suspend operator fun invoke(params: P): Result<R> {
+    suspend operator fun invoke(params: I): Result<O> {
         logger.debug("UseCase started", mapOf("useCase" to this@BaseUseCase::class.simpleName))
         return withContext(dispatcher) {
             try {
@@ -35,17 +35,20 @@ abstract class BaseUseCase<in P, out R>(
         }
     }
 
-    protected abstract suspend fun execute(params: P): R
+    protected abstract suspend fun execute(params: I): O
 }
 
 /**
- * BaseUseCase không yêu cầu tham số truyền vào (NoParams).
+ * BaseNoInputUseCase không yêu cầu tham số truyền vào (NoInput).
  */
-abstract class BaseNoParamsUseCase<R>(
+abstract class BaseNoInputUseCase<out O : BaseOutput>(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     logger: AppLogger = NoOpLogger,
     errorMapper: ErrorMapper = DefaultErrorMapper
-) : BaseUseCase<NoParams, R>(dispatcher, logger, errorMapper) {
+) : BaseUseCase<NoInput, O>(dispatcher, logger, errorMapper) {
 
-    suspend operator fun invoke() = invoke(NoParams)
+    suspend operator fun invoke(): Result<O> = invoke(NoInput)
 }
+
+@Deprecated("Use BaseNoInputUseCase instead", ReplaceWith("BaseNoInputUseCase<O>"))
+typealias BaseNoParamsUseCase<O> = BaseNoInputUseCase<O>

@@ -56,15 +56,17 @@ Android: Hilt at the application boundary, lifecycle-scoped ViewModels, coroutin
 | Area | Implementation |
 | --- | --- |
 | Architecture | Five modules organized by layer; a Gradle task checks project dependency boundaries |
+| Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` via `environment` dimension & suffix isolation |
+| Environment config | `AppConfig` / `AppEnvironment` validating API base URL and dynamically injected into Retrofit |
 | Presentation | Compose, Material 3, destination-scoped ViewModels, lifecycle-aware state collection |
 | Dependency injection | Hilt providers in `app/di`; domain and data stay independent of the DI framework |
-| Domain | Entities, repository contracts, session contract, suspend/Flow/sync/paging use case bases |
+| Domain | Entities, repository contracts, session contract, `BaseInput`/`BaseOutput` contracts, use case bases |
 | Networking | Retrofit, OkHttp, Gson, DTO mapping, HTTP/body/JSON error handling |
-| UI operations | Keyed loading, retained effects with acknowledgment, explicit retry permission |
+| UI & Concurrency | `LoadingManager`, `ActionRunner`, RxDart-equivalent policies (`throttleFirst`, `droppable`, `sequential`, `debounceWithLatest`) |
 | Todo sample | Observable in-memory source, synchronized writes, validation, `SavedStateHandle` draft |
 | Users sample | Public JSONPlaceholder endpoint with `_page` / `_limit` pagination |
 | Session | Preferences DataStore, atomic session snapshots, retryable restoration, persistent expiration |
-| Tests | Kotlin/JUnit, coroutine tests, MockWebServer, and Robolectric |
+| CI & Tests | GitHub Actions workflow, Kotlin/JUnit, coroutine tests (runTest), MockWebServer, and Robolectric |
 
 ## Getting started
 
@@ -91,17 +93,17 @@ Open the root directory in Android Studio, configure the Gradle JDK, and sync th
 
 ```bash
 chmod +x gradlew
-./gradlew verifyModuleBoundaries :app:assembleDebug
+./gradlew verifyModuleBoundaries :app:assembleDevDebug
 ```
 
 **Windows / PowerShell**
 
 ```powershell
-.\gradlew.bat verifyModuleBoundaries :app:assembleDebug
+.\gradlew.bat verifyModuleBoundaries :app:assembleDevDebug
 ```
 
-Run the `app` configuration from Android Studio. The APK is generated at
-`app/build/outputs/apk/debug/app-debug.apk`.
+Run the `app` configuration with your chosen variant (`devDebug` recommended for local development).
+The APK is generated at `app/build/outputs/apk/dev/debug/app-dev-debug.apk`.
 
 The public API sample works without an API key. Todo data is kept in memory and resets when the process restarts.
 
@@ -220,17 +222,16 @@ See [adding a screen](docs/architecture.md#adding-a-screen) for the recommended 
 
 ```bash
 ./gradlew verifyModuleBoundaries
-./gradlew :domain:test :data:test :shared:test :app:testDebugUnitTest
-./gradlew :app:assembleDebug :app:lintDebug
+./gradlew :domain:test :data:test :shared:test
+./gradlew :app:testDevDebugUnitTest :app:testProdDebugUnitTest
+./gradlew :app:assembleDevDebug :app:assembleProdDebug
 ```
 
 On Windows, use `.\gradlew.bat` with the same tasks.
 
-The current local validation on JDK 21 has **35 passing tests**, a successful debug build and module-boundary
-check, and **0 lint errors / 72 warnings**. Some Compose-specific lint checks are skipped because of a lint API
-compatibility warning. These results describe the checked local revision.
+The current local validation on JDK 21 has **103 passing tests** across all modules (17 domain, 7 data, 33 shared, 46 app), a successful build across `devDebug` and `prodDebug` variants, verified module boundaries, and CI automation via GitHub Actions (`.github/workflows/ci.yml`).
 
-Read [testing and verification](docs/testing.md) for coverage, report paths, and the remaining validation limits.
+Read [testing and verification](docs/testing.md) for variant details, coverage, report paths, and the remaining validation limits.
 
 ## Scope and limitations
 

@@ -1,5 +1,7 @@
 package com.example.base.di
 
+import com.example.base.config.AppConfig
+
 import com.example.base.data.api.ApiErrorParser
 import com.example.base.data.api.DataErrorMapper
 import com.example.base.data.api.JsonPlaceholderService
@@ -37,6 +39,9 @@ object DataModule {
     @Provides
     fun errorMapper(mapper: DataErrorMapper): ErrorMapper = mapper
 
+    @Provides @Singleton
+    fun appConfig(): AppConfig = AppConfig.fromBuildConfig()
+
     // Public client: no authentication interceptor or session tokens.
     @Provides @Singleton
     fun httpClient(): OkHttpClient = OkHttpClient.Builder()
@@ -45,8 +50,8 @@ object DataModule {
         .build()
 
     @Provides @Singleton
-    fun retrofit(client: OkHttpClient, gson: Gson): Retrofit = Retrofit.Builder()
-        .baseUrl("https://jsonplaceholder.typicode.com/")
+    fun retrofit(client: OkHttpClient, gson: Gson, config: AppConfig): Retrofit = Retrofit.Builder()
+        .baseUrl(config.apiBaseUrl)
         .client(client)
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()

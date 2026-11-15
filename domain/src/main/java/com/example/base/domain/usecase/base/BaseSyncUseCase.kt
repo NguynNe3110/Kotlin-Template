@@ -7,11 +7,11 @@ import com.example.base.shared.logging.NoOpLogger
 import com.example.base.shared.result.Result
 import kotlinx.coroutines.CancellationException
 
-abstract class BaseSyncUseCase<in P, out R>(
+abstract class BaseSyncUseCase<in I : BaseInput, out O : BaseOutput>(
     private val logger: AppLogger = NoOpLogger,
     private val errorMapper: ErrorMapper = DefaultErrorMapper
 ) {
-    operator fun invoke(params: P): Result<R> {
+    operator fun invoke(params: I): Result<O> {
         return try {
             Result.Success(execute(params))
         } catch (throwable: Throwable) {
@@ -21,5 +21,12 @@ abstract class BaseSyncUseCase<in P, out R>(
         }
     }
 
-    protected abstract fun execute(params: P): R
+    protected abstract fun execute(params: I): O
+}
+
+abstract class BaseNoInputSyncUseCase<out O : BaseOutput>(
+    logger: AppLogger = NoOpLogger,
+    errorMapper: ErrorMapper = DefaultErrorMapper
+) : BaseSyncUseCase<NoInput, O>(logger, errorMapper) {
+    operator fun invoke(): Result<O> = invoke(NoInput)
 }

@@ -1,11 +1,7 @@
 package com.example.base.ui.base
 
-@JvmInline
-value class LoadingKey(val value: String) {
-    companion object {
-        val Initial = LoadingKey("initial")
-        val Refresh = LoadingKey("refresh")
-        val Submit = LoadingKey("submit")
-        val Pagination = LoadingKey("pagination")
-    }
-}
+/**
+ * Typealias to [com.example.base.shared.action.LoadingKey] for backward compatibility
+ * with UI presentation layer imports.
+ */
+typealias LoadingKey = com.example.base.shared.action.LoadingKey

@@ -27,26 +27,44 @@ Hilt is applied to the Android application. The pure JVM classes are constructed
 | File | Provides |
 | --- | --- |
 | [AppModule](../app/src/main/java/com/example/base/di/AppModule.kt) | Dispatcher provider, logger, application coroutine scope, session adapter/contract |
-| [DataModule](../app/src/main/java/com/example/base/di/DataModule.kt) | Gson, error parser/mapper, public Retrofit service, data source, repository implementations |
+| [DataModule](../app/src/main/java/com/example/base/di/DataModule.kt) | AppConfig, Gson, error parser/mapper, environment-configured Retrofit service, data source, repository implementations |
 | [DomainModule](../app/src/main/java/com/example/base/di/DomainModule.kt) | Observe/add/toggle Todo and paged Users use cases |
 
 `MainApplication` is annotated with `@HiltAndroidApp`; `MainActivity` uses `@AndroidEntryPoint`.
 Each navigation destination obtains its `@HiltViewModel` through `hiltViewModel()`.
 ViewModel lifetimes follow the back stack entry.
 
+## Environment and Build Variants
+
+The build defines an `environment` flavor dimension with two flavors and two build types:
+
+| Variant | Dimension / Flavor | Suffix | Application ID | Target Environment |
+| --- | --- | --- | --- | --- |
+| `devDebug` | `dev` | `.dev.debug` | `com.example.base.dev.debug` | Local development (`dev`) |
+| `devRelease` | `dev` | `.dev` | `com.example.base.dev` | Staging / testing release (`dev`) |
+| `prodDebug` | `prod` | `.debug` | `com.example.base.debug` | Production diagnostics (`prod`) |
+| `prodRelease` | `prod` | (none) | `com.example.base` | Production release artifact (`prod`) |
+
+`AppConfig` (`app/config/AppConfig.kt`) encapsulates the active `AppEnvironment` (`DEV` or `PROD`) and validates the API base URL (requiring valid HTTP/HTTPS scheme and trailing slash). It is read from Gradle `BuildConfig` and injected via Hilt into Retrofit in `DataModule`, preventing hardcoded network endpoints.
+
 ## Use case contracts
 
-All base implementations live in [domain/usecase/base](../domain/src/main/java/com/example/base/domain/usecase/base).
+All base implementations live in [domain/usecase/base](../domain/src/main/java/com/example/base/domain/usecase/base). All input/output contracts derive from `BaseInput` and `BaseOutput`:
 
-| Type | `execute` returns | Public call returns |
-| --- | --- | --- |
-| `BaseUseCase<P, R>` | `R` from a suspend function | `Result<R>` |
-| `BaseNoParamsUseCase<R>` | `R` with `NoParams` | `Result<R>` through `useCase()` |
-| `BaseSyncUseCase<P, R>` | `R` synchronously | `Result<R>` |
-| `BaseFlowUseCase<P, R>` | `Flow<R>` | `Flow<Result<R>>` |
-| `BasePagingUseCase<P, R>` | `PageResult<R>` | `Result<PageResult<R>>` |
+| Type | Contract Parameters | `execute` returns | Public call returns |
+| --- | --- | --- | --- |
+| `BaseUseCase<I, O>` | `I : BaseInput, O : BaseOutput` | `O` from a suspend function | `Result<O>` |
+| `BaseNoInputUseCase<O>` | `O : BaseOutput` (uses `NoInput`) | `O` with `NoInput` | `Result<O>` through `useCase()` |
+| `BaseSyncUseCase<I, O>` | `I : BaseInput, O : BaseOutput` | `O` synchronously | `Result<O>` |
+| `BaseFlowUseCase<I, O>` | `I : BaseInput, O : BaseOutput` | `Flow<O>` | `Flow<Result<O>>` |
+| `BasePagingUseCase<P, R>` | `P : PagingInput, R` | `PageResult<R>` | `Result<PageResult<R>>` |
 
-Inputs and outputs do not need marker interfaces. Paging inputs implement `PagingInput`.
+Feature use cases use dedicated named data contracts:
+- `AddTodoUseCase`: `AddTodoInput(title)` -> `AddTodoOutput(todo)`
+- `GetTodosUseCase`: `NoInput` -> `GetTodosOutput(todos)`
+- `ObserveTodosUseCase`: `NoInput` -> `ObserveTodosOutput(todos)`
+- `ToggleTodoUseCase`: `ToggleTodoInput(id)` -> `ToggleTodoOutput(todo)`
+- `GetUsersUseCase`: `GetUsersInput(page, pageSize)` -> `GetUsersOutput(users, page, pageSize, hasNext)`
 Paging validates positive page/page-size values. Coroutine dispatchers are constructor parameters,
 so tests can use a dispatcher tied to the test scheduler.
 
@@ -100,10 +118,17 @@ saved-state restoration. It is not a replacement for durable storage of user doc
 Submitting snapshots the current draft. Success clears it only if the current text still equals the submitted
 text. A failed write or a newly edited draft stays intact. Business validation is implemented in `AddTodoUseCase`.
 
-## Loading and presentation effects
+## Loading, concurrency policies, and presentation effects
 
-[BaseViewModel](../app/src/main/java/com/example/base/ui/base/BaseViewModel.kt) owns two independent facilities:
+The toolkit separates execution coordination from ViewModel inheritance:
+- **`ActionRunner` & `LoadingManager`** (`shared/action`): Coordinates asynchronous operations, reference-counted loading tracking per `LoadingKey`, and opt-in mutation retry (`allowRetry = true`), completely independent of Android lifecycle or ViewModel.
+- **Flow Policies** (`shared/flow`): Provides RxDart-equivalent reactive concurrency policies:
+  - `throttleFirst(windowDurationMs)`: drops items arriving within window duration, emitting immediately on window expiration.
+  - `droppable(scope, action)`: drops concurrent triggers while an execution is in progress.
+  - `sequential(scope, action)`: serializes task execution in strict FIFO order with configurable buffer overflow strategy.
+  - `debounceWithLatest(timeout, policy)`: debounces user inputs and applies latest-result semantics, supporting immediate task cancellation upon new keystrokes (`IMMEDIATE_ON_NEW_EMISSION`) or deferred cancellation (`AFTER_DEBOUNCE_TIMEOUT`).
 
+[BaseViewModel](../app/src/main/java/com/example/base/ui/base/BaseViewModel.kt) provides convenience wrappers around `ActionRunner` and `LoadingManager`:
 - `loadingKeys`: a reference count per `LoadingKey`. Counts are decremented in `finally`, including cancellation.
 - `effects`: a StateFlow of pending `PendingUiEffect` items, each with an ID.
 

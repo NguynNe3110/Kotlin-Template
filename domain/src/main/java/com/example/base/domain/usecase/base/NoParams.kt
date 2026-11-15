@@ -1,3 +1,4 @@
 package com.example.base.domain.usecase.base
 
-data object NoParams
+@Deprecated("Use NoInput instead", ReplaceWith("NoInput"))
+typealias NoParams = NoInput
