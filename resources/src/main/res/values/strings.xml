@@ -38,6 +38,7 @@
     <string name="session_loading">Checking session…</string>
     <string name="session_expired">Your session has expired. Please sign in again.</string>
     <string name="session_error">Session initialization error.</string>
+    <string name="session_restore_failed">Unable to restore your session.</string>
 
     <!-- Error Messages -->
     <string name="error_network_connection">Network connection error. Please check your internet connection.</string>

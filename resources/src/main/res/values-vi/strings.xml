@@ -38,6 +38,7 @@
     <string name="session_loading">Đang kiểm tra phiên làm việc…</string>
     <string name="session_expired">Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.</string>
     <string name="session_error">Lỗi khởi tạo phiên đăng nhập.</string>
+    <string name="session_restore_failed">Không thể khôi phục phiên làm việc của bạn.</string>
 
     <!-- Error Messages -->
     <string name="error_network_connection">Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet.</string>

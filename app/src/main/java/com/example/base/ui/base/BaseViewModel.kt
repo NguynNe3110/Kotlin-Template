@@ -2,6 +2,7 @@ package com.example.base.ui.base
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.base.resources.R
 import com.example.base.shared.action.ActionRunner
 import com.example.base.shared.action.LoadingKey
 import com.example.base.shared.action.LoadingManager
@@ -125,7 +126,7 @@ open class BaseViewModel(
         when (mode) {
             ErrorPresentationMode.Auto -> {
                 if (error is AppException.ValidationError) {
-                    enqueue(UiEffect.ShowDialog("Validation error", error, onRetry))
+                    enqueue(UiEffect.ShowDialog(UiText.StringResource(R.string.dialog_title_validation), error, onRetry))
                 } else {
                     enqueue(UiEffect.ShowError(error, onRetry))
                 }

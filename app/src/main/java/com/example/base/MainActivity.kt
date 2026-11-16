@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
+import com.example.base.resources.R
 import com.example.base.resources.theme.BaseTheme
 import com.example.base.navigation.AppNavHost
 import com.example.base.navigation.AppNavigatorImpl
@@ -54,8 +56,8 @@ class MainActivity : ComponentActivity() {
                         )
                         is SessionState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Unable to restore your session.")
-                                Button(onClick = sessionManager::retryRestore) { Text("Retry") }
+                                Text(stringResource(R.string.session_restore_failed))
+                                Button(onClick = sessionManager::retryRestore) { Text(stringResource(R.string.button_retry)) }
                             }
                         }
                     }

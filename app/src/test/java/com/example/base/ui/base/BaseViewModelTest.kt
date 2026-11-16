@@ -1,6 +1,7 @@
 package com.example.base.ui.base
 
 import androidx.lifecycle.ViewModelStore
+import com.example.base.resources.R
 import com.example.base.shared.error.AppException
 import com.example.base.shared.result.Result
 import com.example.base.shared.retry.RetryConfig
@@ -96,7 +97,20 @@ class BaseViewModelTest {
         advanceUntilIdle()
         val pending = model.effects.value.single()
         val dialog = assertIs<UiEffect.ShowDialog>(pending.effect)
-        assertEquals("Custom Dialog Title", dialog.title)
+        assertEquals(UiText.DynamicString("Custom Dialog Title"), dialog.title)
+    }
+
+    @Test
+    fun autoErrorModeForValidationErrorPresentsLocalizedValidationDialog() = runTest {
+        val model = model()
+        model.failWithMode(
+            mode = ErrorPresentationMode.Auto,
+            exception = AppException.ValidationError(field = "title", message = "Title is required")
+        )
+        advanceUntilIdle()
+        val pending = model.effects.value.single()
+        val dialog = assertIs<UiEffect.ShowDialog>(pending.effect)
+        assertEquals(UiText.StringResource(R.string.dialog_title_validation), dialog.title)
     }
 
     @Test

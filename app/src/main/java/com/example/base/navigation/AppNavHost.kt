@@ -5,12 +5,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.base.navigation.AppNavigator
+import com.example.base.resources.R
 import com.example.base.domain.session.SessionManager
 import com.example.base.domain.session.SessionState
 import com.example.base.ui.base.BaseScreen
@@ -49,7 +51,7 @@ fun AppNavHost(
                 UsersScreen(usersViewModel, navigator = navigator)
             }
         }
-        composable("login") { Text("Your session has expired. Please sign in again.") }
+        composable("login") { Text(stringResource(R.string.session_expired)) }
         composable("todo/{id}") { entry -> Text("Todo: ${entry.arguments?.getString("id").orEmpty()}") }
     }
 }

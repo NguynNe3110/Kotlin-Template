@@ -1,6 +1,6 @@
 # Kế hoạch hoàn thiện Kotlin MVVM Base
 
-Ngày lập: 15/11/2026. Cập nhật: 15/11/2026. Trạng thái: **Đang triển khai** (Đã hoàn thành và kiểm chứng toàn diện 140 tests: P0, P1, P2, P3, P5; P4, P6, P7, P8 đã hoàn thành hợp đồng kiến trúc cốt lõi, fake adapters, DataStore session restoration, i18n mapper và CI automation; các hạng mục phụ thuộc SDK cloud thật, Room cache, release signing automation và runtime profiling nằm trong backlog theo lộ trình; P9 hoàn thiện quy hoạch kiến trúc collection & pagination UI sẵn sàng triển khai).
+Ngày lập: 15/11/2026. Cập nhật: 16/11/2026. Trạng thái: **Đang triển khai** (Đã hoàn thành và kiểm chứng toàn diện 140 tests: P0, P1, P2, P3, P5; P4, P6, P7, P8 đã hoàn thành hợp đồng kiến trúc cốt lõi, fake adapters, DataStore session restoration, i18n mapper và CI automation; các hạng mục phụ thuộc SDK cloud thật, Room cache, release signing automation và runtime profiling nằm trong backlog theo lộ trình; P9 hoàn thiện quy hoạch kiến trúc collection & pagination UI sẵn sàng triển khai).
 
 Tài liệu gộp yêu cầu về Input/Output, BaseViewModel linh hoạt, i18n, xử lý luồng tương đương RxDart, các backend ngoài REST và môi trường dev/production. Mục tiêu là một bộ nền tảng Android có ví dụ và kiểm chứng rõ ràng, mỗi feature lựa chọn cơ chế phù hợp.
 
@@ -260,7 +260,7 @@ Deliverable bao gồm hợp đồng repository trừu tượng và ba adapter đ
 
 | Gói | Công việc | Bằng chứng hoàn thành | Vị trí source |
 | --- | --- | --- | --- |
-| **REST hiện có** | Config theo môi trường, DTO/error mapping và timeout/retry | `RestEnvironmentMockWebServerTest` (6 tests) | `data/.../integration/rest/` |
+| **REST hiện có và bước tích hợp tiếp** | JSONPlaceholder: config/DTO/error mapping/timeout/retry hiện có; Practice API của người dùng mới đọc contract, chưa tích hợp | `RestEnvironmentMockWebServerTest` (6 tests hiện có); auth rotation/Products cần test riêng khi triển khai | `data/.../integration/rest/`; [kế hoạch Practice API](rest-api-integration-plan.md) |
 | **GraphQL** | Schema/query hợp đồng, phân biệt transport error, GraphQL errors và partial data policy | `GraphQLAdapterTest` (8 tests) | `data/.../integration/graphql/` |
 | **Supabase** | Adapter CRUD, Auth error mapping, RLS (Row Level Security) mapping | `SupabaseAdapterTest` (8 tests) | `data/.../integration/supabase/` |
 | **Firebase** | Firestore CRUD contract, realtime snapshot listener cleanup khi hủy coroutine scope | `FirebaseAdapterTest` (7 tests) | `data/.../integration/firebase/` |
@@ -532,6 +532,37 @@ fun <T> AppPagedGrid(
 - [ ] Viết unit tests kiểm chứng State Machine với virtual time: first-load, refresh, append success, append failure & footer retry, end-of-list.
 - [ ] Task `verifyModuleBoundaries` PASS và không đưa Android types vào `:domain` hay `:data`.
 
+#### P9.1 — Skeleton và shimmer loading (đề xuất)
+
+**Trạng thái: Chưa triển khai.** Review source ngày 16/11/2026 chưa tìm thấy component skeleton/shimmer dùng chung trong app. Skeleton là bố cục placeholder mô phỏng nội dung sắp tải; shimmer là dải sáng chuyển động trên placeholder. Có thể dùng skeleton tĩnh mà không cần shimmer.
+
+**Phạm vi thiết kế:**
+- [ ] Thêm primitive placeholder hình chữ nhật/bo góc, hình tròn và dòng chữ ở UI layer, dự kiến trong `app/ui/components/loading/`; tên/path này là đề xuất, chưa phải API có sẵn.
+- [ ] Dùng Compose shapes/Box và Brush gradient, animation API native; chưa cần thêm thư viện shimmer bên ngoài chỉ để có hiệu ứng.
+- [ ] Cung cấp container hoặc modifier tùy chọn để một màn hình dùng chung tiến trình shimmer. Không tạo một infinite transition riêng cho mỗi item/dòng placeholder.
+- [ ] Tận dụng loading slots của P9; màn hình tự quyết định hình dạng/kích thước placeholder, không bắt mọi màn hình kế thừa BaseScreen/BaseViewModel hoặc dùng cùng một skeleton.
+- [ ] Dùng màu theo theme Material, kiểm tra sáng/tối. Số placeholder hữu hạn theo viewport/layout; không dựng hàng trăm item giả.
+
+**Quy tắc hiển thị:**
+- Initial load khi chưa có dữ liệu: skeleton list/grid tương ứng với bố cục Product card hoặc row.
+- Refresh khi đã có items: giữ items và trạng thái cuộn, dùng refresh indicator; không thay toàn bộ danh sách bằng skeleton.
+- Append: giữ items, chỉ dùng loading footer/slot; lỗi append đổi sang footer retry.
+- Empty/error: tắt loading; không để placeholder che lỗi hoặc chạy vô hạn.
+- Chỉ chạy hiệu ứng khi đang loading và UI đang hiển thị/lifecycle phù hợp. InfiniteTransition còn trong composition vẫn có thể tiếp tục chạy; cần chủ động dừng hoặc tháo animation khi không cần.
+- Khi người dùng tắt/giảm animation, có đường hiển thị skeleton tĩnh. Kiểm chứng cách đọc motion settings trên toolchain hiện tại khi triển khai.
+- Placeholder trang trí không có focus/click hoặc hàng loạt mô tả giả. Cung cấp một loading announcement/semantics phù hợp, dùng chuỗi en/vi qua resources, tránh lặp thông báo trên mỗi frame.
+
+**Kết nối REST:** dùng Public Products làm ví dụ list/grid theo [kế hoạch REST](rest-api-integration-plan.md). Kiểm tra trạng thái tải chậm bằng MockWebServer/fake delay; không giả định API live có query parameter delay/fault injection.
+
+**Nghiệm thu:**
+- [ ] Có sample skeleton list và grid tùy chỉnh qua slot, không coupling sang domain/data.
+- [ ] Kiểm tra initial → success/empty/error, refresh giữ items, append giữ items và retry footer.
+- [ ] Kiểm tra light/dark, font scale, TalkBack và tắt/giảm animation; animation dừng khi hết loading hoặc UI không còn hiển thị.
+- [ ] Có kiểm tra UI phù hợp và đo runtime nếu công bố cải thiện FPS/CPU; không coi ảnh preview đẹp là bằng chứng tối ưu.
+- [ ] Cập nhật hướng dẫn chỉ sau khi component thực sự tồn tại. Lượt này chỉ cập nhật plan, chưa thêm dependency, code hoặc test.
+
+Tham chiếu: [Compose Brush](https://developer.android.com/develop/ui/compose/graphics/draw/brush), [InfiniteTransition](https://developer.android.com/develop/ui/compose/animation/value-based).
+
 ## 6. Thứ tự và điểm dừng có thể review
 
 | Mốc | Nội dung | Kết quả sử dụng được | Trạng thái hiện tại |
@@ -594,7 +625,7 @@ CI được tự động hóa qua `.github/workflows/ci.yml` và sẵn sàng th�
 Các thông tin này không chặn việc hoàn thiện core demo và contract tests:
 
 - Application ID/tên sản phẩm thật nếu đổi khỏi `com.example.base`.
-- Endpoint dev/prod thật và hợp đồng auth/refresh của backend sản phẩm.
+- Đã có [Practice API và hợp đồng auth/refresh](rest-api-integration-plan.md) do người dùng cung cấp ngày 16/11/2026. Cần chốt deployment dev/prod thực tế và kiểm chứng runtime khi tích hợp; không còn coi contract REST là thông tin chưa được cung cấp.
 - Ngôn ngữ mặc định bổ sung và bộ locale mở rộng ngoài en/vi.
 - Backend cloud đầu tiên cần live SDK sample (chọn giữa Apollo Kotlin, Supabase Kotlin hoặc Firebase Android BOM).
 - Cấu hình Firebase (`google-services.json`), Supabase project URL & Anon Key dev/prod thật.
@@ -648,6 +679,8 @@ Theo yêu cầu người dùng ngày 15/11/2026, **mỗi lượt review phải t
 | --- | --- | --- | --- |
 | 15/11/2026 | List/Grid và UI phân trang, đối chiếu base Flutter | Bổ sung P9; xác nhận Flutter có common paged list/grid, Kotlin mới có LazyColumn trong các sample | Source review + tài liệu Compose/Paging; chưa sửa implementation hoặc chạy kiểm tra mới |
 | 15/11/2026 | Hoàn thiện quy hoạch chi tiết P9 (Collection & Pagination UI) | Đặc tả mô hình trạng thái PagedListUiState, chữ ký API composable, logic prefetch cuộn, cơ chế generation cancellation và kế hoạch di chuyển UsersScreen | Tài liệu kế hoạch chi tiết trong docs/base-evolution-plan.md; sẵn sàng bước vào triển khai code |
+| 15/11/2026 | Review tổng thể core v1 và đối chiếu Flutter tại revision 53edac7 | [Kế hoạch ổn định v1](base-v1-review-plan.md): ưu tiên lỗi search giữ nhầm collector job, URL validation, lifecycle effects, i18n còn sót và snippet API chưa tồn tại; giữ P9 là kế hoạch | 140 test khác nhau qua ở core/app variants; 4 variants assemble với demo authorization; lint devDebug 0 lỗi/72 cảnh báo, prodRelease 0 lỗi/49 cảnh báo; source + bytecode search; malformed URL còn qua guard |
+| 16/11/2026 | Skeleton/shimmer Compose và REST API do người dùng cung cấp | Bổ sung P9.1 và [kế hoạch REST](rest-api-integration-plan.md): public Products trước; nested envelopes/errors, paging metadata, 204, PATCH và refresh-token rotation | Đọc Swagger/OpenAPI qua HTTP GET và tìm component trong source; chưa gọi business API, tích hợp code hoặc chạy test mới |
 
 Tham chiếu bổ sung cho P9:
 - [Compose: lazy lists và lazy grids](https://developer.android.com/develop/ui/compose/lists)
