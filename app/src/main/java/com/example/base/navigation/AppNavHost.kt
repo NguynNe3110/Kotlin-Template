@@ -1,21 +1,23 @@
 package com.example.base.navigation
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.material3.Text
-import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.base.navigation.AppNavigator
-import com.example.base.resources.R
 import com.example.base.domain.session.SessionManager
 import com.example.base.domain.session.SessionState
+import com.example.base.ui.auth.AuthViewModel
+import com.example.base.ui.auth.LoginScreen
+import com.example.base.ui.auth.ProfileScreen
 import com.example.base.ui.base.BaseScreen
+import com.example.base.ui.product.ProductListScreen
+import com.example.base.ui.product.ProductViewModel
 import com.example.base.ui.todo.TodoScreen
 import com.example.base.ui.todo.TodoTopBar
 import com.example.base.ui.todo.TodoViewModel
@@ -51,7 +53,29 @@ fun AppNavHost(
                 UsersScreen(usersViewModel, navigator = navigator)
             }
         }
-        composable("login") { Text(stringResource(R.string.session_expired)) }
+        composable("products") {
+            val productViewModel: ProductViewModel = hiltViewModel()
+            ProductListScreen(
+                viewModel = productViewModel,
+                navigator = navigator
+            )
+        }
+        composable("login") {
+            val authViewModel: AuthViewModel = hiltViewModel()
+            LoginScreen(
+                viewModel = authViewModel,
+                navigator = navigator,
+                onLoginSuccess = { navigator.replace(AppRoute.Products) }
+            )
+        }
+        composable("profile") {
+            val authViewModel: AuthViewModel = hiltViewModel()
+            ProfileScreen(
+                viewModel = authViewModel,
+                navigator = navigator,
+                onLogoutSuccess = { navigator.replace(AppRoute.Login) }
+            )
+        }
         composable("todo/{id}") { entry -> Text("Todo: ${entry.arguments?.getString("id").orEmpty()}") }
     }
 }

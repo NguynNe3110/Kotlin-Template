@@ -532,25 +532,23 @@ fun <T> AppPagedGrid(
 - [ ] Viết unit tests kiểm chứng State Machine với virtual time: first-load, refresh, append success, append failure & footer retry, end-of-list.
 - [ ] Task `verifyModuleBoundaries` PASS và không đưa Android types vào `:domain` hay `:data`.
 
-#### P9.1 — Skeleton và shimmer loading (đề xuất)
+#### P9.1 — Skeleton và shimmer loading
 
-**Trạng thái: Chưa triển khai.** Review source ngày 16/11/2026 chưa tìm thấy component skeleton/shimmer dùng chung trong app. Skeleton là bố cục placeholder mô phỏng nội dung sắp tải; shimmer là dải sáng chuyển động trên placeholder. Có thể dùng skeleton tĩnh mà không cần shimmer.
+**Trạng thái: Đã triển khai ngày 16/11/2026.** Thành phần `ShimmerLoading.kt` đã được xây dựng trong `app/src/main/java/com/example/base/ui/components/loading/ShimmerLoading.kt` bằng native Jetpack Compose Brush linear gradient shimmer và `rememberInfiniteTransition`, có fallback skeleton tĩnh khi bật giảm chuyển động (motion reduction / animation scale = 0).
 
 **Phạm vi thiết kế:**
-- [ ] Thêm primitive placeholder hình chữ nhật/bo góc, hình tròn và dòng chữ ở UI layer, dự kiến trong `app/ui/components/loading/`; tên/path này là đề xuất, chưa phải API có sẵn.
-- [ ] Dùng Compose shapes/Box và Brush gradient, animation API native; chưa cần thêm thư viện shimmer bên ngoài chỉ để có hiệu ứng.
-- [ ] Cung cấp container hoặc modifier tùy chọn để một màn hình dùng chung tiến trình shimmer. Không tạo một infinite transition riêng cho mỗi item/dòng placeholder.
-- [ ] Tận dụng loading slots của P9; màn hình tự quyết định hình dạng/kích thước placeholder, không bắt mọi màn hình kế thừa BaseScreen/BaseViewModel hoặc dùng cùng một skeleton.
-- [ ] Dùng màu theo theme Material, kiểm tra sáng/tối. Số placeholder hữu hạn theo viewport/layout; không dựng hàng trăm item giả.
+- [x] Thêm primitive placeholder hình chữ nhật/bo góc, hình tròn và dòng chữ ở UI layer trong `app/src/main/java/com/example/base/ui/components/loading/ShimmerLoading.kt` (`SkeletonBox`, `SkeletonTextLine`, `SkeletonThumbnail`, `SkeletonCard`, `ProductCardSkeleton`, `ProductGridSkeleton`).
+- [x] Dùng Compose shapes/Box và Brush gradient, animation API native; không thêm thư viện shimmer bên ngoài.
+- [x] Cung cấp container/modifier dùng chung tiến trình shimmer (`Modifier.shimmerPlaceholder(...)` và `ShimmerScope`).
+- [x] Tận dụng loading slots; màn hình tự quyết định hình dạng/kích thước placeholder, áp dụng trực tiếp trong `ProductListScreen.kt`.
+- [x] Dùng màu theo theme Material, kiểm tra sáng/tối. Số placeholder hữu hạn theo viewport/layout.
 
 **Quy tắc hiển thị:**
-- Initial load khi chưa có dữ liệu: skeleton list/grid tương ứng với bố cục Product card hoặc row.
-- Refresh khi đã có items: giữ items và trạng thái cuộn, dùng refresh indicator; không thay toàn bộ danh sách bằng skeleton.
-- Append: giữ items, chỉ dùng loading footer/slot; lỗi append đổi sang footer retry.
-- Empty/error: tắt loading; không để placeholder che lỗi hoặc chạy vô hạn.
-- Chỉ chạy hiệu ứng khi đang loading và UI đang hiển thị/lifecycle phù hợp. InfiniteTransition còn trong composition vẫn có thể tiếp tục chạy; cần chủ động dừng hoặc tháo animation khi không cần.
-- Khi người dùng tắt/giảm animation, có đường hiển thị skeleton tĩnh. Kiểm chứng cách đọc motion settings trên toolchain hiện tại khi triển khai.
-- Placeholder trang trí không có focus/click hoặc hàng loạt mô tả giả. Cung cấp một loading announcement/semantics phù hợp, dùng chuỗi en/vi qua resources, tránh lặp thông báo trên mỗi frame.
+- [x] Initial load khi chưa có dữ liệu: skeleton grid tương ứng với bố cục Product card.
+- [x] Refresh khi đã có items: giữ items và trạng thái cuộn, dùng refresh indicator; không thay toàn bộ danh sách bằng skeleton.
+- [x] Append: giữ items, chỉ dùng loading footer/slot; lỗi append đổi sang footer retry.
+- [x] Empty/error: tắt loading; không để placeholder che lỗi hoặc chạy vô hạn.
+- [x] Hỗ trợ giảm chuyển động (motion reduction) qua `LocalReducedMotion` và kiểm tra animation scale hệ thống.
 
 **Kết nối REST:** dùng Public Products làm ví dụ list/grid theo [kế hoạch REST](rest-api-integration-plan.md). Kiểm tra trạng thái tải chậm bằng MockWebServer/fake delay; không giả định API live có query parameter delay/fault injection.
 

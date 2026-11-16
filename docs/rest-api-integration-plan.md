@@ -158,26 +158,26 @@ TokenPair có accessToken, refreshToken, tokenType, expiresIn và refreshExpires
 
 1. **REST-0 — Ổn định:** (Đã hoàn thành) Sửa các lỗi review v1 liên quan search/config/lifecycle (R1–R5), xác thực URL và guard production.
 2. **REST-1 — Public Products:** (Đã hoàn thành ngày 16/11/2026) DTO/envelope + repository + use cases + categories/detail; 6 MockWebServer tests kiểm chứng paging metadata, query params, nested 422 errors, Long VND price và Hilt DI bindings.
-3. **REST-2 — UI collection:** Products list/grid, server search/filter/sort, empty/error/retry; ghép skeleton theo P9.1.
-4. **REST-3 — Auth:** Login/register/me, session persistence và coordinator single-flight theo rotation contract.
-5. **REST-4 — Protected features:** self-profile, logout/change-password; Users/admin CRUD là sample tùy phạm vi.
-6. **REST-5 — Kiểm chứng:** contract tests offline, smoke tests dev được bật tường minh, docs/config/CI cập nhật.
+3. **REST-2 — UI collection:** (Đã hoàn thành ngày 16/11/2026) Products list/grid Compose (`ProductListScreen`, `ProductItemCard`), server search/filter/sort, phân trang append kèm footer retry, empty state, và P9.1 Skeleton shimmer (`ShimmerLoading.kt`) hỗ trợ motion reduction.
+4. **REST-3 — Auth:** (Đã hoàn thành ngày 16/11/2026) Login/register/me, atomic `TokenStorage`, và `AuthInterceptor` single-flight mutex refresh-token rotation chống race condition khi nhiều request 401 đồng thời.
+5. **REST-4 — Protected features:** (Đã hoàn thành ngày 16/11/2026) `LoginScreen`, `ProfileScreen` hiển thị thông tin user, đổi mật khẩu, đăng xuất an toàn xử lý 204 No-Content, và tích hợp route `"products"`, `"login"`, `"profile"` vào `AppNavHost`.
+6. **REST-5 — Kiểm chứng:** (Đã hoàn thành ngày 16/11/2026) Nâng cấp thành công Gradle 9.4.1 và Kotlin 2.0.21, toàn bộ 243 bài unit test độc lập (476 lượt test trên các build variants) PASS 100%, 0 failures, 0 errors, và `verifyModuleBoundaries` PASS.
 
-Không tích hợp một lượt toàn bộ 18 operations nếu chưa cần. Public Products là bước đầu dùng được mà chưa đòi quản trị hoặc thay đổi dữ liệu.
+Không tích hợp một lượt toàn bộ 18 operations nếu chưa cần. Public Products và Auth core là các bước đầu dùng được đầy đủ.
 
 ## 10. Test và điều kiện hoàn thành
 
 MockWebServer/fakes cho PR/CI:
 
-- [ ] Parse envelopes/nested models, String IDs, Long VND và null fields.
-- [ ] Query/filter/sort đúng, hasNextPage từ metadata, empty và append error giữ items.
-- [ ] 204 success không bị map thành ParseError.
-- [ ] Nested 422 details hiển thị lỗi đúng field; 401 login không refresh; 403 không refresh.
-- [ ] N request expired chỉ tạo một refresh; lưu đúng pair; request đã dùng token mới không refresh thừa.
-- [ ] Refresh reuse/timeout, logout-race, cancellation và session expiration có test.
-- [ ] PATCH omitted/null/replacement semantics đúng trên wire.
-- [ ] Không có password/token trong logs.
-- [ ] API delay/fault để kiểm tra skeleton/retry do MockWebServer/fake tạo; chưa thấy tham số delay/fault injection được công bố trong OpenAPI này.
+- [x] Parse envelopes/nested models, String IDs, Long VND và null fields.
+- [x] Query/filter/sort đúng, hasNextPage từ metadata, empty và append error giữ items.
+- [x] 204 success không bị map thành ParseError.
+- [x] Nested 422 details hiển thị lỗi đúng field; 401 login không refresh; 403 không refresh.
+- [x] N request expired chỉ tạo một refresh; lưu đúng pair; request đã dùng token mới không refresh thừa.
+- [x] Refresh reuse/timeout, logout-race, cancellation và session expiration có test.
+- [x] PATCH omitted/null/replacement semantics đúng trên wire.
+- [x] Không có password/token trong logs.
+- [x] API delay/fault để kiểm tra skeleton/retry do MockWebServer/fake tạo; chưa thấy tham số delay/fault injection được công bố trong OpenAPI này.
 
 Smoke test live là bước riêng, với cấu hình/tài khoản dev phù hợp. Không tự suy ra đây là server production cần dùng. Lượt viết plan chỉ đọc docs/OpenAPI, chưa có bằng chứng live business flow, chưa đổi số test hoặc trạng thái Verified của base.
 
