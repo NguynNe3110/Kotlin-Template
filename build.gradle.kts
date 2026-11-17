@@ -11,15 +11,33 @@ plugins {
 
 tasks.register("verifyModuleBoundaries") {
     group = "verification"
-    description = "Checks the allowed project dependencies of the architecture layers."
+    description = "Checks project dependencies and prevents app code from accessing data implementations or network SDKs."
     doLast {
         val allowed = mapOf(
-            ":app" to setOf(":domain", ":data", ":shared", ":resources"),
+            ":app" to setOf(":domain", ":composition", ":shared", ":resources"),
+            ":composition" to setOf(":data", ":domain", ":shared"),
             ":data" to setOf(":domain", ":shared"),
             ":domain" to setOf(":shared"),
             ":resources" to emptySet(),
             ":shared" to emptySet()
         )
+        val forbiddenAppReference = Regex(
+            """\b(?:com\.example\.base\.data|retrofit2|okhttp3|com\.google\.gson)\."""
+        )
+        val compositionReference = Regex("""\bcom\.example\.base\.composition\.""")
+        project(":app").fileTree("src") {
+            include("**/*.kt", "**/*.java")
+        }.forEach { source ->
+            val content = source.readText()
+            check(!forbiddenAppReference.containsMatchIn(content)) {
+                "App must use domain contracts instead of data/network implementations: ${source.relativeTo(rootDir)}"
+            }
+            if (source.invariantSeparatorsPath.contains("/ui/")) {
+                check(!compositionReference.containsMatchIn(content)) {
+                    "UI must not access composition wiring: ${source.relativeTo(rootDir)}"
+                }
+            }
+        }
         subprojects.forEach { module ->
             val permitted = checkNotNull(allowed[module.path]) { "Define boundaries for ${module.path}" }
             module.configurations.forEach { configuration ->

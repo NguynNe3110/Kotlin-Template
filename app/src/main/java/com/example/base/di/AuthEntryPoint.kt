@@ -1,9 +1,5 @@
 package com.example.base.di
 
-import com.example.base.data.api.practice.auth.AuthInterceptor
-import com.example.base.data.api.practice.auth.PracticeAuthApi
-import com.example.base.data.api.practice.auth.TokenStorage
-import com.example.base.data.repository.AuthRepositoryImpl
 import com.example.base.domain.repository.AuthRepository
 import com.example.base.domain.usecase.auth.ChangePasswordUseCase
 import com.example.base.domain.usecase.auth.GetMeUseCase
@@ -20,11 +16,7 @@ import dagger.hilt.components.SingletonComponent
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface AuthEntryPoint {
-    fun tokenStorage(): TokenStorage
-    fun authInterceptor(): AuthInterceptor
-    fun practiceAuthApi(): PracticeAuthApi
     fun authRepository(): AuthRepository
-    fun authRepositoryImpl(): AuthRepositoryImpl
     fun loginUseCase(): LoginUseCase
     fun registerUseCase(): RegisterUseCase
     fun getMeUseCase(): GetMeUseCase

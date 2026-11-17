@@ -8,31 +8,56 @@ inside `app`, sharing domain and data modules.
 
 ## Boundaries
 
-![Compile-time module dependencies](images/module-dependencies.png)
+```mermaid
+flowchart LR
+    app --> composition
+    app --> domain
+    app --> shared
+    app --> resources
+    composition --> data
+    composition --> domain
+    composition --> shared
+    data --> domain
+    data --> shared
+    domain --> shared
+```
 
-The module dependency rules are declared in the root [build script](../build.gradle.kts).
-`verifyModuleBoundaries` inspects direct project dependencies across configurations, permits test dependencies
-on the same module, and rejects project dependencies outside the allowlist.
+The allowlist in the root [build script](../build.gradle.kts) permits app → composition/domain/shared/resources,
+composition → data/domain/shared, data → domain/shared and domain → shared. Test project dependencies are
+checked too. App no longer declares data, Retrofit, OkHttp or Gson as direct dependencies.
 
-The task does not inspect imports within `app`, or enforce every third-party library choice. Screens and
-ViewModels should use domain contracts; imports of concrete data implementations belong in `app/di`.
+The same task rejects data/network implementation references in app sources and composition references
+in app/ui. It complements review; it does not prove every semantic dependency rule.
 
-`domain`, `data`, and `shared` are Kotlin/JVM modules. Android-specific persistence stays in `app/session`.
-The `resources` module owns theme and Android resources. Navigation is presentation behavior and lives in `app`.
+Domain, data and shared remain Kotlin/JVM and independent of Hilt. Resources owns theme/resources.
+Android session persistence and navigation stay in app. A separate presentation module could enforce a
+stronger compiler boundary if the project needs it.
 
 ## Composition root
 
-Hilt is applied to the Android application. The pure JVM classes are constructed by providers:
+[MainApplication](../app/src/main/java/com/example/base/MainApplication.kt) keeps @HiltAndroidApp.
+Reusable providers live in the Android library [composition](../composition). It owns wiring, not
+sequential startup. Hilt aggregates its bindings through the app's transitive dependencies.
 
-| File | Provides |
+| Location | Owns |
 | --- | --- |
-| [AppModule](../app/src/main/java/com/example/base/di/AppModule.kt) | Dispatcher provider, logger, application coroutine scope, session adapter/contract |
-| [DataModule](../app/src/main/java/com/example/base/di/DataModule.kt) | AppConfig, Gson, error parser/mapper, environment-configured Retrofit service, data source, repository implementations |
-| [DomainModule](../app/src/main/java/com/example/base/di/DomainModule.kt) | Observe/add/toggle Todo and paged Users use cases |
+| [AppModule](../app/src/main/java/com/example/base/di/AppModule.kt) | Validated AppConfig → NetworkConfig, dispatcher/logger/application scope, Android session adapter |
+| [NetworkModule](../composition/src/main/java/com/example/base/composition/network/NetworkModule.kt) | Gson, public HTTP client, JSONPlaceholder Retrofit/API |
+| [Auth network](../composition/src/main/java/com/example/base/composition/auth/AuthNetworkModule.kt) | Token storage, public/protected clients, refresh interceptor and API delegate |
+| [Product network](../composition/src/main/java/com/example/base/composition/product/ProductNetworkModule.kt) | Practice product API and error mapper |
+| [Repository wiring](../composition/src/main/java/com/example/base/composition/repository) | Todo/User/Product/Auth implementations bound to domain contracts |
+| [Use case wiring](../composition/src/main/java/com/example/base/composition/usecase) | Domain use cases with injected repositories, dispatchers, logger and error mapper |
 
-`MainApplication` is annotated with `@HiltAndroidApp`; `MainActivity` uses `@AndroidEntryPoint`.
-Each navigation destination obtains its `@HiltViewModel` through `hiltViewModel()`.
-ViewModel lifetimes follow the back stack entry.
+Composition never imports app classes or BuildConfig. App supplies the small NetworkConfig value;
+the existing Practice endpoint constants are preserved separately from the configurable JSONPlaceholder
+endpoint. This refactor does not introduce new environment selection for those Practice constants.
+
+Hilt entry points used by app graph tests expose domain contracts, while provider tests in composition can
+inspect concrete implementations. App enables Hilt's aggregating task; implementation dependencies are
+not changed to api merely to expose data types.
+
+MainActivity uses @AndroidEntryPoint. Navigation destinations obtain @HiltViewModel instances through
+hiltViewModel(), with lifetimes following their back stack entries.
 
 ## Environment and Build Variants
 
@@ -45,7 +70,7 @@ The build defines an `environment` flavor dimension with two flavors and two bui
 | `prodDebug` | `prod` | `.debug` | `com.example.base.debug` | Production diagnostics (`prod`) |
 | `prodRelease` | `prod` | (none) | `com.example.base` | Production release artifact (`prod`) |
 
-`AppConfig` (`app/config/AppConfig.kt`) encapsulates the active `AppEnvironment` (`DEV` or `PROD`) and validates the API base URL (requiring valid HTTP/HTTPS scheme and trailing slash). It is read from Gradle `BuildConfig` and injected via Hilt into Retrofit in `DataModule`, preventing hardcoded network endpoints.
+`AppConfig` (`app/config/AppConfig.kt`) encapsulates the active `AppEnvironment` (`DEV` or `PROD`) and validates the API base URL (requiring valid HTTP/HTTPS scheme and trailing slash). AppModule reads it from Gradle BuildConfig and supplies NetworkConfig to composition's NetworkModule. JSONPlaceholder uses this configured URL; the existing Practice Product/Auth sample URLs remain constants in composition.
 
 ## Use case contracts
 
@@ -203,7 +228,7 @@ The Login destination is a sample placeholder. Connect it to your authentication
 1. Add domain models and repository contracts if the new behavior needs them.
 2. Add a use case for the business operation, using the appropriate suspend/Flow contract.
 3. Implement the repository and mapping in `data`.
-4. Register concrete dependencies in `app/di`.
+4. Register network/repository/use case wiring in `composition`; keep app-specific config/session bindings in `app/di`.
 5. Create `app/ui/<screen>/` with its Screen, ViewModel, and UiState.
 6. Register the route and create the ViewModel in the navigation destination.
 7. Add behavior tests and run the relevant [verification tasks](testing.md).

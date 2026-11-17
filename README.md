@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="docs/images/hero.png" alt="Kotlin MVVM Base — five modules, clear boundaries" width="100%" />
+  <img src="docs/images/hero.png" alt="Kotlin MVVM Base — clear module boundaries" width="100%" />
 </p>
 
 <h1 align="center">Kotlin MVVM Base</h1>
 
 <p align="center">
-  An Android starter built around MVVM, Clean Architecture, and five Gradle modules.<br />
+  An Android starter built around MVVM, Clean Architecture, and six Gradle modules.<br />
   Start with a working example. Keep the boundaries as your app grows.
 </p>
 
 <p align="center">
-  <a href="https://kotlinlang.org/"><img src="https://img.shields.io/badge/Kotlin-1.9.23-7354B6?logo=kotlin&amp;logoColor=white" alt="Kotlin 1.9.23" /></a>
+  <a href="https://kotlinlang.org/"><img src="https://img.shields.io/badge/Kotlin-2.0.21-7354B6?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.0.21" /></a>
   <a href="https://developer.android.com/compose"><img src="https://img.shields.io/badge/UI-Jetpack_Compose-315FC4" alt="Jetpack Compose" /></a>
   <a href="https://dagger.dev/hilt/"><img src="https://img.shields.io/badge/DI-Hilt-087F8C" alt="Hilt dependency injection" /></a>
-  <a href="#architecture"><img src="https://img.shields.io/badge/Gradle_modules-5-152B42" alt="5 Gradle modules" /></a>
+  <a href="#architecture"><img src="https://img.shields.io/badge/Gradle_modules-6-152B42" alt="6 Gradle modules" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-087F8C" alt="MIT License" /></a>
 </p>
 
@@ -56,11 +56,11 @@ Android: Hilt at the application boundary, lifecycle-scoped ViewModels, coroutin
 
 | Area | Implementation |
 | --- | --- |
-| Architecture | Five modules organized by layer; a Gradle task checks project dependency boundaries |
+| Architecture | Six modules organized by responsibility; a Gradle task checks project dependency boundaries |
 | Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` via `environment` dimension & suffix isolation |
 | Environment config | `AppConfig` / `AppEnvironment` validating API base URL and dynamically injected into Retrofit |
 | Presentation | Compose, Material 3, destination-scoped ViewModels, lifecycle-aware state collection |
-| Dependency injection | Hilt providers in `app/di`; domain and data stay independent of the DI framework |
+| Dependency injection | Hilt wiring in `composition`; app owns runtime config/session bindings; domain/data remain independent of Hilt |
 | Domain | Entities, repository contracts, session contract, `BaseInput`/`BaseOutput` contracts, use case bases |
 | Networking | Retrofit, OkHttp, Gson, DTO mapping, HTTP/body/JSON error handling |
 | UI & Concurrency | `LoadingManager`, `ActionRunner`, RxDart-equivalent policies (`throttleFirst`, `droppable`, `sequential`, `debounceWithLatest`) |
@@ -78,7 +78,7 @@ Android: Hilt at the application boundary, lifecycle-scoped ViewModels, coroutin
 - An emulator or device running **Android 7.0 / API 24** or later to run the app.
 - Internet access for the first dependency download and the Users sample.
 
-The wrapper is Gradle **8.11.1**. Select **JDK 21** as the project's Gradle JDK; the IDE's bundled
+The wrapper is Gradle **9.4.1**. Select **JDK 21** as the project's Gradle JDK; the IDE's bundled
 runtime can be a different version. Machine-specific SDK/JDK paths belong in local configuration.
 
 ### Clone and build
@@ -110,34 +110,49 @@ The public API sample works without an API key. Todo data is kept in memory and 
 
 ## Architecture
 
-![Gradle module dependency graph](docs/images/module-dependencies.png)
+```mermaid
+flowchart LR
+    app --> composition
+    app --> domain
+    app --> shared
+    app --> resources
+    composition --> data
+    composition --> domain
+    composition --> shared
+    data --> domain
+    data --> shared
+    domain --> shared
+```
 
 Arrows represent **Gradle project dependencies**. MVVM describes the presentation layer;
 Clean Architecture defines responsibilities; Gradle modules enforce the code boundaries.
 
 | Module | Type | Owns | Project dependencies |
 | --- | --- | --- | --- |
-| [`app`](app) | Android application | Screens, ViewModels, navigation, Android session adapter, Hilt wiring | `domain`, `data`, `shared`, `resources` |
+| [`app`](app) | Android application | Screens, ViewModels, navigation, runtime config, Android session adapter, Hilt entry points | `domain`, `composition`, `shared`, `resources` |
+| [`composition`](composition) | Android library | Hilt network, repository and use case wiring | `data`, `domain`, `shared` |
 | [`domain`](domain) | Kotlin/JVM | Models, repository/session contracts, use cases | `shared` |
 | [`data`](data) | Kotlin/JVM | Repository implementations, API services, DTOs, mappers, data sources | `domain`, `shared` |
 | [`shared`](shared) | Kotlin/JVM | Result, error types, logging, retry, dispatchers | — |
 | [`resources`](resources) | Android library | Theme, colors, strings | — |
 
-`app` references `data` to wire concrete implementations through Hilt. Screens and ViewModels consume domain
-contracts. `domain` does not know about Compose, NavController, DataStore, Retrofit, or Hilt.
+`composition` wires concrete implementations; `app` supplies validated `AppConfig` values through
+`NetworkConfig`. Screens and ViewModels consume domain contracts. `domain` does not know about
+Compose, NavController, DataStore, Retrofit, or Hilt. There is no direct `app` → `data` dependency.
 
 `verifyModuleBoundaries` validates allowed project dependencies, including dependencies in test configurations.
-It also runs with each module's `check` task. The UI-to-domain rule inside `app` remains a code convention.
+It also runs with each module's `check` task, rejects app references to data/network implementations,
+and prevents UI code from referencing composition wiring. This source check complements module boundaries;
+it is not a complete semantic architecture analyzer.
 
 Read the [architecture guide](docs/architecture.md) for the loading, effect, error, and repository contracts.
 
 ## Project structure
 
-![Project structure and module responsibilities](docs/images/project-structure.png)
-
 ```text
 Kotlin-multi-module/
-├── app/                   # Android app, presentation, Hilt composition root
+├── app/                   # Android app, presentation, runtime config and session bindings
+├── composition/           # Hilt network, repository and use case wiring
 ├── domain/                # Business models, contracts, use cases
 ├── data/                  # Repository implementations and data access
 ├── shared/                # Kotlin primitives and utilities
@@ -196,7 +211,7 @@ Gradle can resolve higher AndroidX versions through transitive dependencies.
 
 | Purpose | Technology |
 | --- | --- |
-| Language | Kotlin **1.9.23** |
+| Language | Kotlin **2.0.21** |
 | UI | Jetpack Compose, Material 3; BOM **2024.03.00** |
 | DI | Hilt **2.51.1** |
 | Async / state | Coroutines and StateFlow **1.8.0** |
@@ -204,7 +219,7 @@ Gradle can resolve higher AndroidX versions through transitive dependencies.
 | Networking | Retrofit **2.11.0**, OkHttp **4.12.0**, Gson **2.11.0** |
 | Preferences | DataStore **1.1.1** |
 | Testing | Kotlin/JUnit, coroutine test, MockWebServer, Robolectric **4.16.1** |
-| Build | AGP **8.3.1**, Gradle **8.11.1**, Kotlin DSL, version catalog |
+| Build | AGP **8.3.1**, Gradle **9.4.1**, Kotlin DSL, version catalog |
 
 ## Using this as your base
 
@@ -212,7 +227,7 @@ Gradle can resolve higher AndroidX versions through transitive dependencies.
 2. **Rename the application.** Update `applicationId`, Android namespaces, Kotlin packages, app name,
    and `rootProject.name`. The current package prefix is `com.example.base`.
 3. **Replace the examples.** Add your domain contracts and use cases, then implement repositories in `data`.
-4. **Wire dependencies in `app/di`.** Keep framework-specific provider code at the composition root.
+4. **Wire dependencies in `composition`.** Keep app-owned configuration/session bindings in `app/di`.
 5. **Add screens under `app/ui`.** Register routes in `app/navigation` and obtain each ViewModel in its destination.
 6. **Add application-specific infrastructure.** Configure endpoints, storage, authentication, signing,
    and release settings to match your product.
@@ -224,13 +239,14 @@ See [adding a screen](docs/architecture.md#adding-a-screen) for the recommended 
 ```bash
 ./gradlew verifyModuleBoundaries
 ./gradlew :domain:test :data:test :shared:test
+./gradlew :composition:testDebugUnitTest
 ./gradlew :app:testDevDebugUnitTest :app:testProdDebugUnitTest
 ./gradlew :app:assembleDevDebug :app:assembleProdDebug
 ```
 
 On Windows, use `.\gradlew.bat` with the same tasks.
 
-The current local validation on JDK 21 has **103 passing tests** across all modules (17 domain, 7 data, 33 shared, 46 app), a successful build across `devDebug` and `prodDebug` variants, verified module boundaries, and CI automation via GitHub Actions (`.github/workflows/ci.yml`).
+See [testing and verification](docs/testing.md) for the current local verification snapshot; CI runs the composition tests as well as core and app tests.
 
 Read [testing and verification](docs/testing.md) for variant details, coverage, report paths, and the remaining validation limits.
 

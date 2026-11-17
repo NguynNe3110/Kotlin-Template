@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/images/hero.png" alt="Kotlin MVVM Base — năm module, ranh giới rõ ràng" width="100%" />
+  <img src="docs/images/hero.png" alt="Kotlin MVVM Base — ranh giới module rõ ràng" width="100%" />
 </p>
 
 <h1 align="center">Kotlin MVVM Base</h1>
 
 <p align="center">
-  Base Android dùng MVVM, Clean Architecture và năm Gradle module chia theo layer.<br />
+  Base Android dùng MVVM, Clean Architecture và sáu Gradle module theo trách nhiệm.<br />
   Có ví dụ chạy được để bắt đầu, có ranh giới rõ ràng để phát triển tiếp.
 </p>
 
@@ -28,7 +28,7 @@ Base này thể hiện những quyết định đó qua hai ví dụ nhỏ:
 - **Todo:** quan sát dữ liệu qua Flow, thêm/toggle, validation và khôi phục bản nháp.
 
 Dự án lấy cảm hứng từ các base Flutter Clean Architecture, với cách triển khai phù hợp Android:
-Hilt ở app, ViewModel theo lifecycle, coroutine và StateFlow.
+Hilt wiring trong composition, app giữ entry points, ViewModel theo lifecycle, coroutine và StateFlow.
 
 ## Mục lục
 
@@ -47,20 +47,20 @@ Hilt ở app, ViewModel theo lifecycle, coroutine và StateFlow.
 
 | Thành phần | Cách triển khai |
 | --- | --- |
-| Kiến trúc | 5 module theo layer; Gradle kiểm tra chiều phụ thuộc giữa các module |
+| Kiến trúc | 6 module theo trách nhiệm; Gradle kiểm tra chiều phụ thuộc giữa các module |
 | Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` qua dimension `environment` và hậu tố app ID |
 | Môi trường & Config | `AppConfig` / `AppEnvironment` validate API base URL, inject động vào Retrofit |
 | UI | Jetpack Compose, Material 3, lifecycle-aware state collection |
 | MVVM | ViewModel theo destination, StateFlow cho UiState, SavedStateHandle cho bản nháp |
-| DI | Hilt tại `app/di`, domain và data độc lập DI framework |
+| DI | Hilt wiring tại `composition`; app giữ config/session binding, domain và data độc lập Hilt |
 | Nghiệp vụ | Entity, repository/session contract, `BaseInput`/`BaseOutput` contracts, use case suspend/Flow/sync/paging |
 | Network | Retrofit, OkHttp, Gson, DTO mapper và chuẩn hóa lỗi HTTP/JSON/body |
 | UI & Concurrency | `LoadingManager`, `ActionRunner`, Flow policies tương đương RxDart (`throttleFirst`, `droppable`, `sequential`, `debounceWithLatest`) |
 | Session | Preferences DataStore, snapshot nguyên tử, Retry khi đọc lỗi, lưu trạng thái hết phiên |
 | CI & Kiểm thử | GitHub Actions workflow, Kotlin/JUnit, coroutine test (runTest), MockWebServer, Robolectric |
 
-Các phiên bản khai báo hiện tại: Kotlin **1.9.23**, Hilt **2.51.1**, Coroutines **1.8.0**,
-Retrofit **2.11.0**, Navigation Compose **2.8.9**, Gradle **8.11.1**, AGP **8.3.1**.
+Các phiên bản khai báo hiện tại: Kotlin **2.0.21**, Hilt **2.51.1**, Coroutines **1.8.0**,
+Retrofit **2.11.0**, Navigation Compose **2.8.9**, Gradle **9.4.1**, AGP **8.3.1**.
 Xem [version catalog](gradle/libs.versions.toml) để biết toàn bộ dependency.
 Gradle có thể resolve phiên bản AndroidX cao hơn qua dependency bắc cầu.
 
@@ -103,32 +103,46 @@ API mẫu không cần key. Todo lưu trong bộ nhớ, nên dữ liệu sẽ re
 
 ## Kiến trúc
 
-![Chiều phụ thuộc giữa các Gradle module](docs/images/module-dependencies.png)
+```mermaid
+flowchart LR
+    app --> composition
+    app --> domain
+    app --> shared
+    app --> resources
+    composition --> data
+    composition --> domain
+    composition --> shared
+    data --> domain
+    data --> shared
+    domain --> shared
+```
 
 Mũi tên trong hình là **project dependency của Gradle**.
 MVVM tổ chức tầng presentation; Clean Architecture chia trách nhiệm; Gradle module tạo ranh giới biên dịch.
 
 | Module | Loại | Trách nhiệm | Phụ thuộc |
 | --- | --- | --- | --- |
-| [`app`](app) | Android application | Compose, ViewModel, navigation, Android session adapter, Hilt wiring | `domain`, `data`, `shared`, `resources` |
+| [`app`](app) | Android application | Compose, ViewModel, navigation, runtime config, Android session adapter, Hilt entry points | `domain`, `composition`, `shared`, `resources` |
+| [`composition`](composition) | Android library | Wiring Hilt cho network, repository và use case | `data`, `domain`, `shared` |
 | [`domain`](domain) | Kotlin/JVM | Model nghiệp vụ, repository/session contract, use case | `shared` |
 | [`data`](data) | Kotlin/JVM | Repository implementation, API, DTO, mapper, data source | `domain`, `shared` |
 | [`shared`](shared) | Kotlin/JVM | Result, lỗi, retry, logging, dispatchers | Không có |
 | [`resources`](resources) | Android library | Theme, màu, chuỗi | Không có |
 
-`app` tham chiếu `data` để Hilt lắp ghép implementation. Screen/ViewModel dùng contract và use case của domain.
+`composition` lắp ghép implementation; `app` truyền cấu hình đã validate qua `NetworkConfig`.
+Screen/ViewModel dùng contract và use case của domain. App không dependency trực tiếp data.
 Domain không phụ thuộc Compose, NavController, DataStore, Retrofit hoặc Hilt.
 
 Task `verifyModuleBoundaries` kiểm tra project dependency, bao gồm cấu hình test, và chạy cùng `check`.
-Quy tắc Screen/ViewModel chỉ dùng domain trong nội bộ `app` vẫn là quy ước khi viết/review code.
+Task còn chặn app tham chiếu data/network implementation và UI tham chiếu composition wiring.
+Đây là source check bổ sung cho module boundaries, chưa phải phân tích ngữ nghĩa kiến trúc toàn diện.
 
 ## Cấu trúc project
 
-![Cấu trúc package và trách nhiệm từng module](docs/images/project-structure.png)
-
 ```text
 Kotlin-multi-module/
-├── app/                   # Android, presentation, Hilt composition root
+├── app/                   # Android, presentation, config và session binding
+├── composition/           # Wiring Hilt cho network, repository, use case
 ├── domain/                # Nghiệp vụ và contract
 ├── data/                  # Truy cập dữ liệu và implementation
 ├── shared/                # Thành phần Kotlin dùng chung
@@ -196,7 +210,7 @@ Chi tiết contract và source tham khảo nằm trong [hướng dẫn kiến tr
 1. Fork/copy project và giữ [license notice](LICENSE) của phần mã tái sử dụng.
 2. Đổi `applicationId`, namespace Android, package Kotlin, tên app và `rootProject.name`.
 3. Thay các mẫu Todo/Users bằng entity, contract và use case của sản phẩm.
-4. Implement repository/data source ở `data`; khai báo provider Hilt tại `app/di`.
+4. Implement repository/data source ở `data`; khai báo wiring Hilt tại `composition`. App giữ binding config/session đặc thù.
 5. Thêm package màn hình ở `app/ui`, route ở `app/navigation`, lấy ViewModel ngay tại destination.
 6. Cấu hình endpoint, storage, authentication, signing và release theo yêu cầu sản phẩm.
 
@@ -207,13 +221,14 @@ Xem [thứ tự thêm màn hình](docs/architecture.md#adding-a-screen) cùng li
 ```powershell
 .\gradlew.bat verifyModuleBoundaries
 .\gradlew.bat :domain:test :data:test :shared:test
+.\gradlew.bat :composition:testDebugUnitTest
 .\gradlew.bat :app:testDevDebugUnitTest :app:testProdDebugUnitTest
 .\gradlew.bat :app:assembleDevDebug :app:assembleProdDebug
 ```
 
 Trên macOS/Linux, thay `.\gradlew.bat` bằng `./gradlew`.
 
-Bản đã kiểm tra local bằng JDK 21 có **103 test qua** trên toàn bộ 4 module (17 domain, 7 data, 33 shared, 46 app), build thành công trên cả hai variant `devDebug` và `prodDebug`, và đã tích hợp CI workflow trên GitHub Actions (`.github/workflows/ci.yml`).
+Xem snapshot kiểm chứng local trong [testing.md](docs/testing.md). CI chạy thêm composition tests cùng core và app tests.
 Xem [phạm vi kiểm thử và vị trí report](docs/testing.md).
 
 ## Phạm vi hiện tại

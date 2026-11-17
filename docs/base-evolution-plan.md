@@ -1,6 +1,6 @@
 # Kế hoạch hoàn thiện Kotlin MVVM Base
 
-Ngày lập: 15/11/2026. Cập nhật: 16/11/2026. Trạng thái: **Đang triển khai** (Đã hoàn thành và kiểm chứng toàn diện 140 tests: P0, P1, P2, P3, P5; P4, P6, P7, P8 đã hoàn thành hợp đồng kiến trúc cốt lõi, fake adapters, DataStore session restoration, i18n mapper và CI automation; các hạng mục phụ thuộc SDK cloud thật, Room cache, release signing automation và runtime profiling nằm trong backlog theo lộ trình; P9 hoàn thiện quy hoạch kiến trúc collection & pagination UI sẵn sàng triển khai).
+Ngày lập: 15/11/2026. Cập nhật: 17/11/2026. Trạng thái: **Đang triển khai** (Đã hoàn thành và kiểm chứng toàn diện 140 tests: P0, P1, P2, P3, P5; P4, P6, P7, P8 đã hoàn thành hợp đồng kiến trúc cốt lõi, fake adapters, DataStore session restoration, i18n mapper và CI automation; các hạng mục phụ thuộc SDK cloud thật, Room cache, release signing automation và runtime profiling nằm trong backlog theo lộ trình; P9 hoàn thiện quy hoạch kiến trúc collection & pagination UI sẵn sàng triển khai).
 
 Tài liệu gộp yêu cầu về Input/Output, BaseViewModel linh hoạt, i18n, xử lý luồng tương đương RxDart, các backend ngoài REST và môi trường dev/production. Mục tiêu là một bộ nền tảng Android có ví dụ và kiểm chứng rõ ràng, mỗi feature lựa chọn cơ chế phù hợp.
 
@@ -19,13 +19,15 @@ Tài liệu gộp yêu cầu về Input/Output, BaseViewModel linh hoạt, i18n,
 
 **Phạm vi của tài liệu hiện tại:** Đóng vai trò kim chỉ nam kiến trúc (Living Architecture Document), phản ánh chính xác hiện trạng triển khai của codebase (140 unit tests pass, boundaries pass, 4 variants compile và CI hoạt động), đồng thời vạch rõ ranh giới giữa các thành phần đã kiểm chứng và các hạng mục roadmap trong tương lai.
 
+**Cập nhật DI ngày 17/11/2026:** đã thêm module `:composition`, tổng cộng 6 Gradle modules; app không dependency trực tiếp data/network SDK. Xem [kế hoạch và kết quả DI](di-modularization-plan.md) cho vị trí wiring, 234 case trong reports và giới hạn Gradle 9.4.1/AGP 8.3.1. Các số 140 tests ở phần snapshot cũ bên dưới thuộc lượt kiểm chứng 15/11, không phải tổng hiện tại.
+
 ## 2. Căn cứ từ code hiện tại
 
 ### 2.1. Ma trận năng lực kiến trúc (Capability Matrix)
 
 | Năng lực / Thành phần | Trạng thái | Minh chứng / Bằng chứng kiểm thử | Vị trí sở hữu |
 | --- | --- | --- | --- |
-| **Module Boundaries & 5 Layer Core** | Đã kiểm chứng (Verified) | `verifyModuleBoundaries` kiểm tra dependency allowlist chặt chẽ cho cả 5 modules (`app`, `domain`, `data`, `shared`, `resources`) | Root `build.gradle.kts` |
+| **Module Boundaries & Composition Wiring** | Đã kiểm tra ngày 17/11/2026 | Allowlist 6 modules, app source không gọi data/network, UI không gọi wiring; Hilt graph tests ở cả hai debug flavors qua | Root `build.gradle.kts`, `composition/`; [kết quả DI](di-modularization-plan.md) |
 | **Build Variants (dev/prod x debug/release)** | Đã kiểm chứng (Verified) | Suffix `.dev` và `.debug`, 4 variants: `devDebug`, `devRelease`, `prodDebug`, `prodRelease`; task `checkProdReleaseConfig` chặn demo fallback | `app/build.gradle.kts` (P1) |
 | **Cấu hình môi trường & URL Injection** | Đã kiểm chứng (Verified) | `AppConfig`, `AppEnvironment`, URL validation, Retrofit injection qua `DataModule`, 6 tests trong `AppConfigTest` | `app/src/main/java/com/example/base/config/AppConfig.kt` (P1) |
 | **Hợp đồng Input/Output Use Case** | Đã kiểm chứng (Verified) | `BaseInput`, `BaseOutput`, `NoInput`, `NoOutput`, `AddTodoInput/Output`, `GetTodosOutput`, `GetUsersInput/Output`, 17 tests trong `UseCaseContractsTest` | `domain/src/main/java/com/example/base/domain/usecase/base/` (P2) |
@@ -43,7 +45,7 @@ Tài liệu gộp yêu cầu về Input/Output, BaseViewModel linh hoạt, i18n,
 
 | Hạng mục | Hiện trạng quan sát được | Hướng xử lý |
 | --- | --- | --- |
-| Module | 5 modules: `app`, `domain`, `data`, `shared`, `resources` | Duy trì 5 modules làm core; `data` giữ là pure Kotlin/JVM |
+| Module | 6 modules: `app`, `composition`, `domain`, `data`, `shared`, `resources` | `composition` sở hữu wiring Hilt; core `domain/data/shared` giữ Kotlin/JVM không Hilt |
 | Startup | `SessionState` (`Loading`, `Ready`, `Error`), `DataStoreSessionManager` tự phục hồi session | Duy trì cơ chế hiện có, không tái tạo framework phức tạp |
 | Base use case | `BaseUseCase`, `BaseFlowUseCase`, `BaseSyncUseCase`, `BasePagingUseCase` | Chuẩn hóa toàn bộ tham số vào/ra qua `BaseInput`/`BaseOutput` |
 | Input/Output | `AddTodoInput/Output`, `GetTodosOutput`, `GetUsersInput/Output`, `NoInput/NoOutput` | Duy trì hợp đồng tường minh, kiểm thử chặt chẽ tại `UseCaseContractsTest` |
@@ -671,7 +673,7 @@ Theo yêu cầu người dùng ngày 15/11/2026, **mỗi lượt review phải t
 - Với chủ đề độc lập, tạo file plan riêng và liên kết từ kế hoạch tổng thể; không ghi vào thư mục đang bị gitignore nếu tài liệu cần theo dõi trong Git.
 - Phân biệt: phát hiện lỗi, capability còn thiếu, đề xuất thiết kế, đã sửa qua đọc source và đã kiểm chứng bằng test/run.
 - Không đổi checkbox sang hoàn thành chỉ vì đã có skeleton/fake hoặc mô tả trong commit.
-- Giữ các quyết định của người dùng: Kotlin/Android idiomatic, Input/Output rõ ràng, composition tùy chọn và năm-module core mặc định.
+- Giữ các quyết định của người dùng: Kotlin/Android idiomatic, Input/Output rõ ràng, composition tùy chọn; từ 17/11/2026 có thêm module wiring `:composition` bên cạnh năm module cũ theo quyết định người dùng.
 
 | Ngày | Phạm vi review | Kết quả và hành động | Bằng chứng kiểm chứng |
 | --- | --- | --- | --- |
@@ -679,6 +681,7 @@ Theo yêu cầu người dùng ngày 15/11/2026, **mỗi lượt review phải t
 | 15/11/2026 | Hoàn thiện quy hoạch chi tiết P9 (Collection & Pagination UI) | Đặc tả mô hình trạng thái PagedListUiState, chữ ký API composable, logic prefetch cuộn, cơ chế generation cancellation và kế hoạch di chuyển UsersScreen | Tài liệu kế hoạch chi tiết trong docs/base-evolution-plan.md; sẵn sàng bước vào triển khai code |
 | 15/11/2026 | Review tổng thể core v1 và đối chiếu Flutter tại revision 53edac7 | [Kế hoạch ổn định v1](base-v1-review-plan.md): ưu tiên lỗi search giữ nhầm collector job, URL validation, lifecycle effects, i18n còn sót và snippet API chưa tồn tại; giữ P9 là kế hoạch | 140 test khác nhau qua ở core/app variants; 4 variants assemble với demo authorization; lint devDebug 0 lỗi/72 cảnh báo, prodRelease 0 lỗi/49 cảnh báo; source + bytecode search; malformed URL còn qua guard |
 | 16/11/2026 | Skeleton/shimmer Compose và REST API do người dùng cung cấp | Bổ sung P9.1 và [kế hoạch REST](rest-api-integration-plan.md): public Products trước; nested envelopes/errors, paging metadata, 204, PATCH và refresh-token rotation | Đọc Swagger/OpenAPI qua HTTP GET và tìm component trong source; chưa gọi business API, tích hợp code hoặc chạy test mới |
+| 17/11/2026 | Triển khai module wiring `:composition` | Tách network/repository/usecase; app giữ config/session; chuyển provider tests, domain-only entry points, cập nhật CI/docs | Debug builds/tests/boundaries qua wrapper 9.4.1; release/lint qua executable Gradle 8.11.1, wrapper giữ nguyên; xem [bằng chứng và giới hạn](di-modularization-plan.md) |
 
 Tham chiếu bổ sung cho P9:
 - [Compose: lazy lists và lazy grids](https://developer.android.com/develop/ui/compose/lists)

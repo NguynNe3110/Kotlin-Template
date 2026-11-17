@@ -16,6 +16,7 @@ MockWebServer tests exercise networking locally.
 ```bash
 ./gradlew verifyModuleBoundaries
 ./gradlew :domain:test :data:test :shared:test
+./gradlew :composition:testDebugUnitTest
 ./gradlew :app:testDevDebugUnitTest :app:testProdDebugUnitTest
 ./gradlew :app:assembleDevDebug :app:assembleProdDebug
 ./gradlew :app:lintDevDebug :app:lintProdRelease
@@ -35,6 +36,7 @@ add `--rerun-tasks`. This is useful when validating an environment change or col
 
 | Area | Examples protected by tests |
 | --- | --- |
+| Composition wiring | Migrated Product/Auth provider tests, app-supplied network base path/query via MockWebServer, domain-only Hilt graph tests in app |
 | Domain use cases | Thrown failures, cancellation propagation, errors during Flow construction, BaseInput/BaseOutput contracts (17 tests) |
 | Network boundary & Non-REST integrations | Request query parameters, DTO conversion, HTTP error envelopes, empty response bodies, malformed JSON; repository contracts & fake adapters for GraphQL, Supabase, Firebase, and MockWebServer REST switching (29 unit tests; live cloud SDKs remain roadmap backlog) |
 | In-memory data | Concurrent additions and toggles preserve data |
@@ -60,7 +62,40 @@ The project configures two product flavors (`dev`, `prod`) under dimension `envi
 
 Each flavor generates `BuildConfig.ENVIRONMENT` and `BuildConfig.API_BASE_URL` (configurable via `DEV_API_BASE_URL` and `PROD_API_BASE_URL` properties/environment variables, with public JSONPlaceholder default). `AppConfig` validates scheme and trailing slash at runtime.
 
-## Local verification snapshot
+## Verification snapshot — 17 November 2026 (composition refactor)
+
+| Check | Result | Runner |
+| --- | --- | --- |
+| Boundaries, devDebug/prodDebug APKs and app tests | Passed; app reports 87 tests per flavor, including real Hilt graph tests | Project wrapper: Gradle 9.4.1 |
+| Composition debug tests | 17 passed (16 migrated provider tests + 1 network config boundary test) | Wrapper 9.4.1 |
+| Core JVM test tasks | Passed, UP-TO-DATE; reports: domain 39, data 54, shared 37 | Wrapper 9.4.1 |
+| Composition release tests | 17 passed | Installed Gradle 8.11.1 |
+| devRelease/prodRelease APKs | Passed with explicit demo authorization | Installed Gradle 8.11.1 |
+| Composition lintDebug | 0 errors / 0 warnings | Installed Gradle 8.11.1 |
+| App lintDevDebug / lintProdRelease | 0 errors; 72 / 49 warnings | Installed Gradle 8.11.1 |
+
+There are **234 unique cases** in these reports. Re-running app flavors and composition build types does
+not create additional unique cases. Core tasks reused existing successful outputs.
+
+**Toolchain limitation:** release/lint tasks with wrapper 9.4.1 and AGP 8.3.1 fail loading
+`org.gradle.api.artifacts.SelfResolvingDependency` in AGP's VariantDependencies. Supplemental checks used
+an already installed Gradle 8.11.1 executable; wrapper and version catalog were not changed.
+To reproduce those supplemental checks, use that Gradle version's executable rather than the current
+wrapper. Confirm its version first:
+
+```bash
+gradle --version
+gradle :composition:testReleaseUnitTest :app:assembleDevRelease :app:assembleProdRelease :composition:lintDebug :app:lintDevDebug :app:lintProdRelease -PALLOW_DEMO_PROD_API=true
+```
+
+The command above assumes Gradle 8.11.1 is the `gradle` on PATH. Release demo authorization is for local
+artifact verification, not a production endpoint/signing certification. CI adds composition debug tests
+to the existing wrapper-based debug pipeline; remote CI was not executed.
+
+No device/emulator UI validation, live business API calls or profiling were performed for this refactor.
+See the [DI implementation plan](di-modularization-plan.md) for ownership and source-check limits.
+
+## Historical verification snapshot — 15 November 2026
 
 The following describes the revision checked on **15 November 2026**, using JDK 21:
 
@@ -89,6 +124,8 @@ Continuous integration is defined and automated via GitHub Actions in `.github/w
 | Domain tests | `domain/build/reports/tests/test/index.html` |
 | Data tests | `data/build/reports/tests/test/index.html` |
 | Shared tests | `shared/build/reports/tests/test/index.html` |
+| Composition debug tests | `composition/build/reports/tests/testDebugUnitTest/index.html` |
+| Composition release tests | `composition/build/reports/tests/testReleaseUnitTest/index.html` |
 | App devDebug tests | `app/build/reports/tests/testDevDebugUnitTest/index.html` |
 | App prodDebug tests | `app/build/reports/tests/testProdDebugUnitTest/index.html` |
 | Lint | `app/build/reports/lint-results-devDebug.html` |

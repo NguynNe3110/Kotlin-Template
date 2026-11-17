@@ -2,6 +2,8 @@ package com.example.base.di
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.base.composition.config.NetworkConfig
+import com.example.base.config.AppConfig
 import com.example.base.domain.session.SessionManager
 import com.example.base.session.DataStoreSessionManager
 import com.example.base.shared.dispatcher.DefaultDispatcherProvider
@@ -27,6 +29,12 @@ annotation class ApplicationScope
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    @Provides @Singleton
+    fun appConfig(): AppConfig = AppConfig.fromBuildConfig()
+
+    @Provides @Singleton
+    fun networkConfig(config: AppConfig): NetworkConfig = NetworkConfig(config.apiBaseUrl)
+
     @Provides @Singleton
     fun dispatchers(): DispatcherProvider = DefaultDispatcherProvider()
 
