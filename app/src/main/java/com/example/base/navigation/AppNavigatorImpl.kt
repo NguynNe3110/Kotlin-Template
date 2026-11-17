@@ -15,13 +15,13 @@ class AppNavigatorImpl(
 ) : AppNavigator {
     override fun navigate(route: AppRoute) {
         val destination = route.toDestination()
-        logger.debug("Navigate", mapOf("route" to destination))
+        logger.debug("Navigate", mapOf("route" to route::class.simpleName))
         controller.navigate(destination)
     }
 
     override fun replace(route: AppRoute) {
         val destination = route.toDestination()
-        logger.debug("Replace route", mapOf("route" to destination))
+        logger.debug("Replace route", mapOf("route" to route::class.simpleName))
         controller.navigate(destination) {
             popUpTo(controller.graph.id) { inclusive = true }
             launchSingleTop = true

@@ -62,7 +62,31 @@ The project configures two product flavors (`dev`, `prod`) under dimension `envi
 
 Each flavor generates `BuildConfig.ENVIRONMENT` and `BuildConfig.API_BASE_URL` (configurable via `DEV_API_BASE_URL` and `PROD_API_BASE_URL` properties/environment variables, with public JSONPlaceholder default). `AppConfig` validates scheme and trailing slash at runtime.
 
-## Verification snapshot — 17 November 2026 (composition refactor)
+## Verification snapshot — 17 November 2026 (environment logging)
+
+Developer AppLogger output is enabled only for devDebug. LoggingPolicyTest covers all four
+environment/build-type combinations using the same URL and captures output at every log level.
+AuthDiGraphTest checks the actual singleton logger supplied by Hilt in all four app variants.
+RepositoryLoggingPrivacyTest exercises seven auth operations on success and failure, and checks
+that a product query reaches the local API without appearing in logs. ConsoleLoggerTest covers
+developer events and suppression of exception messages/causes/stack traces.
+
+| Check | Result | Runner |
+| --- | --- | --- |
+| Boundaries and shared/domain/data/composition tests | Passed; reports shared 39, domain 39, data 57, composition 17 | Wrapper 9.4.1 |
+| App devDebug/prodDebug tests and APKs | 92 passed per variant | Wrapper 9.4.1 |
+| App devRelease/prodRelease tests and APKs | 92 passed per variant | Installed Gradle 8.11.1 |
+| App lintDevDebug/lintProdRelease | 0 errors; 72/49 warnings | Installed Gradle 8.11.1 |
+
+Reports contain **244 unique cases**, including 10 new cases in this logging change. Repeated variant
+runs are not additional unique cases. Release tasks used explicit demo authorization. The wrapper
+9.4.1/AGP 8.3.1 release/lint limitation remains; no toolchain or endpoint changed.
+
+No live business API calls or device Logcat inspection were performed. These results cover AppLogger
+output, not independently generated OS/SDK logs. HTTP logging remains disabled.
+See the [logging implementation plan](environment-logging-review-plan.md).
+
+## Earlier snapshot — 17 November 2026 (composition refactor)
 
 | Check | Result | Runner |
 | --- | --- | --- |

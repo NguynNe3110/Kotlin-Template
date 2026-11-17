@@ -24,6 +24,9 @@ data class AppConfig(
     val apiBaseUrl: String,
     val isDebug: Boolean = false,
 ) {
+    /** Developer console logs are enabled only for devDebug, regardless of backend URL. */
+    val developerLoggingEnabled: Boolean get() = environment.isDev && isDebug
+
     init {
         require(apiBaseUrl.isNotBlank()) { "API base URL must not be blank" }
         require(apiBaseUrl.endsWith("/")) {

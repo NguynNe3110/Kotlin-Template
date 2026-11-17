@@ -59,6 +59,7 @@ Android: Hilt at the application boundary, lifecycle-scoped ViewModels, coroutin
 | Architecture | Six modules organized by responsibility; a Gradle task checks project dependency boundaries |
 | Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` via `environment` dimension & suffix isolation |
 | Environment config | `AppConfig` / `AppEnvironment` validating API base URL and dynamically injected into Retrofit |
+| Developer logging | AppLogger output only in devDebug; prod and devRelease use NoOpLogger, even with a shared backend URL |
 | Presentation | Compose, Material 3, destination-scoped ViewModels, lifecycle-aware state collection |
 | Dependency injection | Hilt wiring in `composition`; app owns runtime config/session bindings; domain/data remain independent of Hilt |
 | Domain | Entities, repository contracts, session contract, `BaseInput`/`BaseOutput` contracts, use case bases |

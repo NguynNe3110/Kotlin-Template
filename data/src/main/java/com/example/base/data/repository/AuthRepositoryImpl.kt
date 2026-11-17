@@ -32,7 +32,7 @@ class AuthRepositoryImpl(
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<SessionInfo> {
-        logger.info("Executing login for email=$email")
+        logger.info("Executing login")
         return try {
             val response = api.login(LoginRequestDto(email = email, password = password))
                 .requireBody("POST /auth/login")
@@ -41,13 +41,13 @@ class AuthRepositoryImpl(
             Result.Success(session)
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
-            logger.error("Login failed for email=$email", throwable)
+            logger.error("Login failed")
             Result.Failure(errorMapper.map(throwable))
         }
     }
 
     override suspend fun register(email: String, password: String, name: String): Result<SessionInfo> {
-        logger.info("Executing registration for email=$email, name=$name")
+        logger.info("Executing registration")
         return try {
             val response = api.register(RegisterRequestDto(email = email, password = password, name = name))
                 .requireBody("POST /auth/register")
@@ -56,7 +56,7 @@ class AuthRepositoryImpl(
             Result.Success(session)
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
-            logger.error("Registration failed for email=$email", throwable)
+            logger.error("Registration failed")
             Result.Failure(errorMapper.map(throwable))
         }
     }
@@ -71,7 +71,7 @@ class AuthRepositoryImpl(
             Result.Success(tokenPair)
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
-            logger.error("Token refresh failed", throwable)
+            logger.error("Token refresh failed")
             Result.Failure(errorMapper.map(throwable))
         }
     }
@@ -88,7 +88,7 @@ class AuthRepositoryImpl(
             Result.Success(user)
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
-            logger.error("getMe failed", throwable)
+            logger.error("getMe failed")
             Result.Failure(errorMapper.map(throwable))
         }
     }
@@ -105,7 +105,7 @@ class AuthRepositoryImpl(
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             tokenStorage.clearSession()
-            logger.error("Logout failed on server, session cleared locally", throwable)
+            logger.error("Logout failed on server, session cleared locally")
             Result.Failure(errorMapper.map(throwable))
         }
     }
@@ -122,7 +122,7 @@ class AuthRepositoryImpl(
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
             tokenStorage.clearSession()
-            logger.error("LogoutAll failed on server, session cleared locally", throwable)
+            logger.error("LogoutAll failed on server, session cleared locally")
             Result.Failure(errorMapper.map(throwable))
         }
     }
@@ -139,7 +139,7 @@ class AuthRepositoryImpl(
             Result.Success(Unit)
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
-            logger.error("Change password failed", throwable)
+            logger.error("Change password failed")
             Result.Failure(errorMapper.map(throwable))
         }
     }

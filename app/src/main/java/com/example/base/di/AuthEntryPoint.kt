@@ -6,6 +6,7 @@ import com.example.base.domain.usecase.auth.GetMeUseCase
 import com.example.base.domain.usecase.auth.LoginUseCase
 import com.example.base.domain.usecase.auth.LogoutUseCase
 import com.example.base.domain.usecase.auth.RegisterUseCase
+import com.example.base.shared.logging.AppLogger
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -16,6 +17,7 @@ import dagger.hilt.components.SingletonComponent
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface AuthEntryPoint {
+    fun logger(): AppLogger
     fun authRepository(): AuthRepository
     fun loginUseCase(): LoginUseCase
     fun registerUseCase(): RegisterUseCase

@@ -10,6 +10,7 @@ import com.example.base.shared.dispatcher.DefaultDispatcherProvider
 import com.example.base.shared.dispatcher.DispatcherProvider
 import com.example.base.shared.logging.AppLogger
 import com.example.base.shared.logging.ConsoleLogger
+import com.example.base.shared.logging.NoOpLogger
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,7 +40,8 @@ object AppModule {
     fun dispatchers(): DispatcherProvider = DefaultDispatcherProvider()
 
     @Provides @Singleton
-    fun logger(): AppLogger = ConsoleLogger()
+    fun logger(config: AppConfig): AppLogger =
+        if (config.developerLoggingEnabled) ConsoleLogger() else NoOpLogger
 
     @Provides @Singleton @ApplicationScope
     fun applicationScope(dispatchers: DispatcherProvider): CoroutineScope =

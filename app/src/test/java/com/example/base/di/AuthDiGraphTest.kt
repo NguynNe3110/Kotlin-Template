@@ -1,6 +1,9 @@
 package com.example.base.di
 
+import com.example.base.BuildConfig
 import com.example.base.MainApplication
+import com.example.base.shared.logging.ConsoleLogger
+import com.example.base.shared.logging.NoOpLogger
 import com.example.base.domain.repository.AuthRepository
 import dagger.hilt.android.EntryPointAccessors
 import org.junit.runner.RunWith
@@ -10,11 +13,25 @@ import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = MainApplication::class)
 class AuthDiGraphTest {
+
+    @Test
+    fun loggerInApplicationGraphRespectsTheActualVariant() {
+        val app = RuntimeEnvironment.getApplication() as MainApplication
+        val entryPoint = EntryPointAccessors.fromApplication(app, AuthEntryPoint::class.java)
+        val logger = entryPoint.logger()
+        when (BuildConfig.ENVIRONMENT) {
+            "dev" -> if (BuildConfig.DEBUG) assertIs<ConsoleLogger>(logger) else assertSame(NoOpLogger, logger)
+            "prod" -> assertSame(NoOpLogger, logger)
+            else -> error("Unexpected build environment")
+        }
+        assertSame(logger, entryPoint.logger(), "Logger binding must retain its singleton scope")
+    }
 
     @Test
     fun testAuthBindingsAreResolvedFromHiltGraph() {

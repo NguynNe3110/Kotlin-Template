@@ -50,6 +50,7 @@ Hilt wiring trong composition, app giữ entry points, ViewModel theo lifecycle,
 | Kiến trúc | 6 module theo trách nhiệm; Gradle kiểm tra chiều phụ thuộc giữa các module |
 | Build variants | `devDebug`, `devRelease`, `prodDebug`, `prodRelease` qua dimension `environment` và hậu tố app ID |
 | Môi trường & Config | `AppConfig` / `AppEnvironment` validate API base URL, inject động vào Retrofit |
+| Developer logging | Chỉ devDebug bật AppLogger; prod và devRelease dùng NoOpLogger, kể cả khi dùng chung backend URL |
 | UI | Jetpack Compose, Material 3, lifecycle-aware state collection |
 | MVVM | ViewModel theo destination, StateFlow cho UiState, SavedStateHandle cho bản nháp |
 | DI | Hilt wiring tại `composition`; app giữ config/session binding, domain và data độc lập Hilt |

@@ -72,6 +72,20 @@ The build defines an `environment` flavor dimension with two flavors and two bui
 
 `AppConfig` (`app/config/AppConfig.kt`) encapsulates the active `AppEnvironment` (`DEV` or `PROD`) and validates the API base URL (requiring valid HTTP/HTTPS scheme and trailing slash). AppModule reads it from Gradle BuildConfig and supplies NetworkConfig to composition's NetworkModule. JSONPlaceholder uses this configured URL; the existing Practice Product/Auth sample URLs remain constants in composition.
 
+## Developer logging
+
+AppConfig.developerLoggingEnabled is true only when environment is DEV and isDebug is true.
+AppModule selects ConsoleLogger for devDebug and NoOpLogger for devRelease, prodDebug and prodRelease.
+Both flavors may use the same backend URL; logging policy does not depend on the host.
+
+Auth diagnostics omit email, name and raw throwable payloads. ConsoleLogger prints throwable types only,
+not exception messages/causes/stack traces. Product search logs pagination metadata rather than the full
+filter; navigation logs the route type rather than its arguments. New message/metadata fields still
+need review. HTTP body logging is not enabled.
+
+This controls AppLogger output, not logs emitted independently by Android or third-party SDKs.
+See the [logging implementation and verification plan](environment-logging-review-plan.md).
+
 ## Use case contracts
 
 All base implementations live in [domain/usecase/base](../domain/src/main/java/com/example/base/domain/usecase/base). All input/output contracts derive from `BaseInput` and `BaseOutput`:

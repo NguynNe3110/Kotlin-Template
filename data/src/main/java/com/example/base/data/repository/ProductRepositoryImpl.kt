@@ -29,7 +29,7 @@ class ProductRepositoryImpl(
         pageSize: Int,
         filter: ProductFilter?
     ): Result<PagedResult<Product>> {
-        logger.info("Loading products from Practice API: page=$page, pageSize=$pageSize, filter=$filter")
+        logger.info("Loading products from Practice API", mapOf("page" to page, "pageSize" to pageSize))
         return try {
             val response = api.getProducts(
                 page = page,

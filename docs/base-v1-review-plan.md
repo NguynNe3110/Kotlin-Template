@@ -245,3 +245,9 @@ Xem [kết quả, runner và giới hạn](di-modularization-plan.md): debug fla
 ### Review logging theo môi trường — 17/11/2026
 
 [Kế hoạch logging](environment-logging-review-plan.md): AppModule vẫn luôn cấp ConsoleLogger cho cả dev/prod và debug/release; HTTP logging chưa được gắn. AuthRepositoryImpl log email/name trực tiếp. Đề xuất chỉ bật developer logs ở devDebug, chọn NoOpLogger cho prod và bỏ thông tin cá nhân khỏi mọi log. Một backend URL dùng chung không cản trở việc phân policy; chưa sửa code hoặc kiểm Logcat/build trong lượt này.
+
+### Hoàn thành logging theo môi trường — 17/11/2026
+
+Đã áp dụng AppConfig.developerLoggingEnabled và binding ConsoleLogger chỉ cho devDebug; ba variant còn lại dùng NoOpLogger. Auth logs bỏ email/name/raw throwable; console không in exception message/cause/stack trace. Product filter và route arguments không còn bị dump vào diagnostic logs.
+
+[Plan logging và bằng chứng](environment-logging-review-plan.md): 244 case khác nhau trong reports; Hilt logger graph test chạy đủ 4 variants; tests/builds qua, lint 0 lỗi. Debug dùng wrapper 9.4.1, release/lint dùng executable 8.11.1 có sẵn. Không đổi backend/toolchain, không gọi API live hoặc kiểm Logcat thiết bị.

@@ -14,9 +14,10 @@ object NoOpLogger : AppLogger {
     override fun error(message: String, throwable: Throwable?) = Unit
 }
 
+/** Throwable diagnostics expose the type only; exception messages may contain server/user data. */
 class ConsoleLogger : AppLogger {
     override fun debug(message: String, metadata: Map<String, Any?>) = println("DEBUG: $message $metadata")
     override fun info(message: String, metadata: Map<String, Any?>) = println("INFO: $message $metadata")
-    override fun warning(message: String, throwable: Throwable?) = println("WARN: $message ${throwable?.message.orEmpty()}")
-    override fun error(message: String, throwable: Throwable?) = println("ERROR: $message ${throwable?.message.orEmpty()}")
+    override fun warning(message: String, throwable: Throwable?) = println("WARN: $message ${throwable?.javaClass?.simpleName.orEmpty()}")
+    override fun error(message: String, throwable: Throwable?) = println("ERROR: $message ${throwable?.javaClass?.simpleName.orEmpty()}")
 }
